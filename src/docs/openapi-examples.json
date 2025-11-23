@@ -1,0 +1,105 @@
+{
+  "/api/admins/dashboard": {},
+  "/api/admins/companies/pending": {},
+  "/api/admins/companies/{companyId}": {},
+  "/api/admins/companies/{companyId}/verify": {},
+  "/api/admins/companies/{companyId}/reject": {},
+  "/api/admins/companies/{companyId}/suspend": {},
+  "/api/admins/students/import": {},
+  "/api/admins/students/import/{jobId}": {},
+  "/api/admins/mentors/assign": {},
+  "/api/admins/credits/process": {},
+  "/api/admins/reports/system": {},
+  "/api/admins/analytics/system": {},
+  "/api/admins/analytics/college": {},
+  "/api/admins/system/health": {},
+  "/api/admins/ai/usage": {},
+  "/api/auth/students/register": {},
+  "/api/auth/companies/register": {},
+  "/api/auth/mentors/register": {},
+  "/api/auth/admins/register": {},
+  "/api/auth/login": {},
+  "/api/auth/send-password-reset": {},
+  "/api/auth/verify-email": {},
+  "/api/auth/me": {},
+  "/api/auth/password": {},
+  "/api/auth/profile/image": {},
+  "/api/auth/profile/resume": {},
+  "/api/auth/account": {},
+  "/api/companies/dashboard": {},
+  "/api/companies/profile": {},
+  "/api/companies/internships": {},
+  "/api/companies/internships/{internshipId}": {},
+  "/api/companies/internships/{internshipId}/complete": {},
+  "/api/companies/internships/{internshipId}/applicants": {},
+  "/api/companies/applications/review": {},
+  "/api/companies/applications/shortlist": {},
+  "/api/companies/applications/reject": {},
+  "/api/companies/interns/progress": {},
+  "/api/companies/logbooks/{logbookId}/feedback": {},
+  "/api/companies/events": {},
+  "/api/companies/challenges": {},
+  "/api/health": {},
+  "/api/mentors/dashboard": {},
+  "/api/mentors/applications/pending": {},
+  "/api/mentors/applications/{applicationId}": {},
+  "/api/mentors/applications/{applicationId}/approve": {},
+  "/api/mentors/applications/{applicationId}/reject": {},
+  "/api/mentors/logbooks/pending": {},
+  "/api/mentors/logbooks/{logbookId}": {},
+  "/api/mentors/logbooks/{logbookId}/approve": {},
+  "/api/mentors/logbooks/{logbookId}/revision": {},
+  "/api/mentors/skill-gaps": {},
+  "/api/mentors/department/performance": {},
+  "/api/mentors/interventions": {},
+  "/api/mentors/students/{studentId}/progress": {},
+  "/api/students/dashboard": {},
+  "/api/students/internships": {},
+  "/api/students/internships/recommended": {},
+  "/api/students/applications": {},
+  "/api/students/applications/{applicationId}": {},
+  "/api/students/modules/recommended": {},
+  "/api/students/modules/start": {},
+  "/api/students/modules/complete": {},
+  "/api/students/interviews/start": {},
+  "/api/students/interviews/answer": {},
+  "/api/students/interviews/end": {},
+  "/api/students/interviews/history": {},
+  "/api/students/logbooks": {},
+  "/api/students/credits": {},
+  "/api/students/reports/nep": {},
+  "/api/students/chatbot": {},
+  "/api/tests/email": {
+    "post": {
+      "to": "test@example.com",
+      "subject": "Test Email",
+      "template": "welcome",
+      "data": {
+        "name": "John Doe",
+        "link": "https://example.com"
+      }
+    }
+  },
+  "/api/tests/s3": {
+    "post": {
+      "file": "string",
+      "folder": "test"
+    }
+  },
+  "/api/tests/queue": {
+    "post": {
+      "queueName": "email",
+      "data": {
+        "to": "test@example.com",
+        "template": "welcome"
+      }
+    }
+  },
+  "/api/tests/gemini": {
+    "post": {
+      "prompt": "Write a brief summary about artificial intelligence",
+      "model": "flash"
+    }
+  },
+  "/api/tests/status": {}
+}

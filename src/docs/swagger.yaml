@@ -1,0 +1,2626 @@
+# Prashiskshan API Documentation
+# This file contains comprehensive API documentation for all endpoints
+#
+# API Routes Organization:
+# ========================
+# 1. AUTHENTICATION (/api/auth/*)
+#    - POST   /auth/students/register      - Register new student
+#    - POST   /auth/companies/register     - Register new company
+#    - POST   /auth/mentors/register        - Register new mentor
+#    - POST   /auth/admins/register         - Register new admin
+#    - POST   /auth/login                   - User login
+#    - POST   /auth/send-password-reset     - Send password reset email
+#    - POST   /auth/verify-email            - Send email verification
+#    - GET    /auth/verify-email            - Verify email with code
+#    - GET    /auth/me                      - Get current user profile
+#    - PATCH  /auth/me                      - Update user profile
+#    - POST   /auth/password                - Change password
+#    - POST   /auth/profile/image           - Upload profile image
+#    - POST   /auth/profile/resume          - Upload resume
+#    - DELETE /auth/account                 - Delete account
+#
+# 2. STUDENTS (/api/students/*)
+#    - GET    /students/dashboard                    - Get student dashboard
+#    - GET    /students/internships                   - Browse internships
+#    - GET    /students/internships/recommended       - Get recommended internships
+#    - POST   /students/applications                  - Apply to internship
+#    - GET    /students/applications                  - Get my applications
+#    - DELETE /students/applications/:id              - Withdraw application
+#    - GET    /students/modules/recommended           - Get recommended modules
+#    - POST   /students/modules/start                 - Start learning module
+#    - POST   /students/modules/complete              - Complete learning module
+#    - POST   /students/interviews/start              - Start interview practice
+#    - POST   /students/interviews/answer             - Submit interview answer
+#    - POST   /students/interviews/end                - End interview session
+#    - GET    /students/interviews/history           - Get interview history
+#    - POST   /students/logbooks                      - Submit logbook
+#    - GET    /students/logbooks                      - Get my logbooks
+#    - GET    /students/credits                       - Get credits summary
+#    - POST   /students/reports/nep                   - Generate NEP report
+#    - POST   /students/chatbot                       - Chatbot query
+#
+# 3. COMPANIES (/api/companies/*)
+#    - GET    /companies/dashboard                           - Get company dashboard
+#    - GET    /companies/profile                             - Get company profile
+#    - PATCH  /companies/profile                             - Update company profile
+#    - POST   /companies/internships                         - Create internship
+#    - GET    /companies/internships                         - Get all internships
+#    - PUT    /companies/internships/:id                     - Update internship
+#    - DELETE /companies/internships/:id                     - Delete internship
+#    - POST   /companies/internships/:id/complete           - Mark internship complete
+#    - GET    /companies/internships/:id/applicants         - Get applicants
+#    - POST   /companies/applications/review                - Review applications
+#    - POST   /companies/applications/shortlist             - Shortlist candidates
+#    - POST   /companies/applications/reject                 - Reject candidates
+#    - GET    /companies/interns/progress                    - Get intern progress
+#    - POST   /companies/logbooks/:id/feedback               - Provide logbook feedback
+#    - POST   /companies/events                              - Create event
+#    - POST   /companies/challenges                          - Create challenge
+#
+# 4. MENTORS (/api/mentors/*)
+#    - GET    /mentors/dashboard                            - Get mentor dashboard
+#    - GET    /mentors/applications/pending                 - Get pending applications
+#    - GET    /mentors/applications/:id                     - Get application details
+#    - POST   /mentors/applications/:id/approve             - Approve application
+#    - POST   /mentors/applications/:id/reject               - Reject application
+#    - GET    /mentors/logbooks/pending                     - Get pending logbooks
+#    - GET    /mentors/logbooks/:id                         - Get logbook details
+#    - POST   /mentors/logbooks/:id/approve                 - Approve logbook
+#    - POST   /mentors/logbooks/:id/revision                - Request logbook revision
+#    - GET    /mentors/skill-gaps                           - Get skill gap analysis
+#    - GET    /mentors/department/performance               - Get department performance
+#    - POST   /mentors/interventions                        - Create intervention
+#    - GET    /mentors/interventions                        - Get all interventions
+#    - GET    /mentors/students/:id/progress                - Get student progress
+#
+# 5. ADMIN (/api/admins/*)
+#    - GET    /admins/dashboard                             - Get admin dashboard
+#    - GET    /admins/companies/pending                     - Get pending companies
+#    - GET    /admins/companies/:id                         - Get company details
+#    - POST   /admins/companies/:id/verify                  - Verify company
+#    - POST   /admins/companies/:id/reject                  - Reject company
+#    - POST   /admins/companies/:id/suspend                - Suspend company
+#    - POST   /admins/students/import                       - Bulk import students
+#    - GET    /admins/students/import/:jobId                - Get import job status
+#    - POST   /admins/mentors/assign                        - Assign mentor
+#    - POST   /admins/credits/process                       - Process credits
+#    - POST   /admins/reports/system                        - Generate system report
+#    - GET    /admins/analytics/system                      - Get system analytics
+#    - GET    /admins/analytics/college                     - Get college analytics
+#    - GET    /admins/system/health                         - Get system health
+#    - GET    /admins/ai/usage                             - Get AI usage stats
+#
+# 6. TESTING (/api/tests/*) - See routes/tests.js for JSDoc documentation
+#    - POST   /tests/email                                 - Test email service
+#    - POST   /tests/s3                                    - Test S3 storage
+#    - POST   /tests/queue                                 - Test queue service
+#    - POST   /tests/gemini                                 - Test Gemini AI
+#    - GET    /tests/status                                - Get services status
+#
+# 7. HEALTH CHECK
+#    - GET    /api/health                                  - API health check
+
+paths:
+  # ==================== AUTHENTICATION ENDPOINTS ====================
+  /api/auth/students/register:
+    post:
+      summary: Register a new student
+      description: Create a new student account with Firebase authentication
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, profile]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "student@university.edu"
+                password:
+                  type: string
+                  format: password
+                  minLength: 8
+                  example: "SecurePass123!"
+                profile:
+                  type: object
+                  required: [name, department, year, college]
+                  properties:
+                    name:
+                      type: string
+                      example: "John Doe"
+                    department:
+                      type: string
+                      example: "Computer Science"
+                    year:
+                      type: integer
+                      minimum: 1
+                      maximum: 4
+                      example: 3
+                    college:
+                      type: string
+                      example: "University Name"
+                    rollNumber:
+                      type: string
+                      example: "CS2024001"
+                    phone:
+                      type: string
+                      example: "+919876543210"
+                    bio:
+                      type: string
+                      example: "Passionate about software development"
+                    skills:
+                      type: array
+                      items:
+                        type: string
+                      example: ["JavaScript", "Node.js", "React"]
+                    interests:
+                      type: array
+                      items:
+                        type: string
+                      example: ["Web Development", "AI"]
+                phone:
+                  type: string
+                  example: "+919876543210"
+                preferences:
+                  type: object
+                  properties:
+                    notifications:
+                      type: object
+                      properties:
+                        email:
+                          type: boolean
+                          example: true
+                        sms:
+                          type: boolean
+                          example: false
+      responses:
+        '201':
+          description: Student registered successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          student:
+                            $ref: '#/components/schemas/Student'
+                          token:
+                            type: string
+                            example: "firebase-id-token"
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/auth/companies/register:
+    post:
+      summary: Register a new company
+      description: Create a new company account with Firebase authentication
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, companyName, documents]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "contact@company.com"
+                password:
+                  type: string
+                  format: password
+                  minLength: 8
+                  example: "SecurePass123!"
+                companyName:
+                  type: string
+                  example: "Tech Solutions Inc"
+                website:
+                  type: string
+                  format: uri
+                  example: "https://techsolutions.com"
+                phone:
+                  type: string
+                  example: "+919876543210"
+                address:
+                  type: string
+                  example: "123 Business Park, Mumbai"
+                documents:
+                  type: object
+                  required: [cinNumber]
+                  properties:
+                    cinNumber:
+                      type: string
+                      example: "U72900MH2024PTC123456"
+                    gstCertificate:
+                      type: string
+                      format: uri
+                      example: "https://example.com/gst.pdf"
+                pointOfContact:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                      example: "Jane Smith"
+                    designation:
+                      type: string
+                      example: "HR Manager"
+                    email:
+                      type: string
+                      format: email
+                      example: "hr@techsolutions.com"
+                    phone:
+                      type: string
+                      example: "+919876543211"
+      responses:
+        '201':
+          description: Company registered successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          company:
+                            $ref: '#/components/schemas/Company'
+                          token:
+                            type: string
+        '400':
+          description: Validation error
+        '409':
+          description: Email already registered
+
+  /api/auth/mentors/register:
+    post:
+      summary: Register a new mentor
+      description: Create a new mentor account with Firebase authentication
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, profile]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "mentor@university.edu"
+                password:
+                  type: string
+                  format: password
+                  minLength: 8
+                  example: "SecurePass123!"
+                profile:
+                  type: object
+                  required: [name, department]
+                  properties:
+                    name:
+                      type: string
+                      example: "Dr. Jane Smith"
+                    department:
+                      type: string
+                      example: "Computer Science"
+                    designation:
+                      type: string
+                      example: "Associate Professor"
+                    phone:
+                      type: string
+                      example: "+919876543210"
+                    bio:
+                      type: string
+                      example: "Experienced mentor with 10+ years in academia"
+                    expertiseAreas:
+                      type: array
+                      items:
+                        type: string
+                      example: ["Web Development", "Database Systems"]
+                preferences:
+                  type: object
+                  properties:
+                    notifications:
+                      type: object
+                      properties:
+                        email:
+                          type: boolean
+                          example: true
+                        sms:
+                          type: boolean
+                          example: false
+      responses:
+        '201':
+          description: Mentor registered successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          mentor:
+                            $ref: '#/components/schemas/Mentor'
+                          firebaseUid:
+                            type: string
+        '400':
+          description: Validation error
+        '409':
+          description: Email already registered
+
+  /api/auth/admins/register:
+    post:
+      summary: Register a new admin
+      description: Create a new admin account with Firebase authentication. In production, requires super_admin authentication.
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, name]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "admin@prashiskshan.com"
+                password:
+                  type: string
+                  format: password
+                  minLength: 8
+                  example: "SecurePass123!"
+                name:
+                  type: string
+                  example: "Admin User"
+                role:
+                  type: string
+                  enum: [super_admin, admin, support]
+                  default: admin
+                  example: "admin"
+                permissions:
+                  type: array
+                  items:
+                    type: string
+                  example: ["manage_users", "manage_companies"]
+      responses:
+        '201':
+          description: Admin registered successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          admin:
+                            type: object
+                            properties:
+                              adminId:
+                                type: string
+                              email:
+                                type: string
+                              name:
+                                type: string
+                              role:
+                                type: string
+                          firebaseUid:
+                            type: string
+        '400':
+          description: Validation error
+        '403':
+          description: Forbidden - Only super admins can create admin accounts in production
+        '409':
+          description: Email already registered
+
+  /api/auth/send-password-reset:
+    post:
+      summary: Send password reset email
+      description: Send a password reset link to the user's email address
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "user@example.com"
+      responses:
+        '200':
+          description: Password reset email sent successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+        '400':
+          description: Email is required
+        '404':
+          description: User not found
+
+  /api/auth/verify-email:
+    post:
+      summary: Send email verification
+      description: Send an email verification link to the authenticated user's email
+      tags: [Authentication]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Verification email sent successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+        '401':
+          description: Unauthorized
+        '400':
+          description: User email not found
+
+    get:
+      summary: Verify email
+      description: Verify user email using the verification code (oobCode) from the email link
+      tags: [Authentication]
+      parameters:
+        - in: query
+          name: oobCode
+          required: true
+          schema:
+            type: string
+          description: Verification code from email link
+          example: "ABC123XYZ"
+      responses:
+        '200':
+          description: Email verified successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+        '400':
+          description: Invalid or expired verification code
+
+  /api/auth/login:
+    post:
+      summary: User login
+      description: Authenticate user with Firebase ID token and get user profile
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [idToken]
+              properties:
+                idToken:
+                  type: string
+                  description: Firebase ID token obtained from client authentication
+                  example: "firebase-id-token-string"
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          user:
+                            type: object
+                            description: User profile based on role (Student, Company, Mentor, or Admin)
+                          token:
+                            type: string
+        '401':
+          description: Invalid token
+        '404':
+          description: User profile not found
+
+  /api/auth/me:
+    get:
+      summary: Get current user profile
+      description: Retrieve the authenticated user's profile information
+      tags: [Authentication]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          user:
+                            type: object
+        '401':
+          description: Unauthorized
+
+    patch:
+      summary: Update user profile
+      description: Update the authenticated user's profile information
+      tags: [Authentication]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                profile:
+                  type: object
+                  description: Profile fields to update (varies by user role)
+      responses:
+        '200':
+          description: Profile updated successfully
+        '401':
+          description: Unauthorized
+
+  /api/auth/password:
+    post:
+      summary: Change password
+      description: Change user password (requires re-authentication)
+      tags: [Authentication]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [newPassword, idToken]
+              properties:
+                newPassword:
+                  type: string
+                  format: password
+                  minLength: 8
+                  example: "NewSecurePass123!"
+                idToken:
+                  type: string
+                  description: Current Firebase ID token for verification
+      responses:
+        '200':
+          description: Password changed successfully
+        '401':
+          description: Unauthorized or invalid token
+
+  /api/auth/profile/image:
+    post:
+      summary: Upload profile image
+      description: Upload a profile image for the authenticated user
+      tags: [Authentication]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file (max 5MB, formats: jpg, png, webp)
+      responses:
+        '200':
+          description: Image uploaded successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          imageUrl:
+                            type: string
+                            format: uri
+        '401':
+          description: Unauthorized
+        '400':
+          description: Invalid file format or size
+
+  /api/auth/profile/resume:
+    post:
+      summary: Upload resume
+      description: Upload a resume document (students only)
+      tags: [Authentication]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF file (max 10MB)
+      responses:
+        '200':
+          description: Resume uploaded successfully
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Students only
+
+  /api/auth/account:
+    delete:
+      summary: Delete account
+      description: Soft delete the authenticated user's account
+      tags: [Authentication]
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Account deleted successfully
+        '401':
+          description: Unauthorized
+
+  # ==================== STUDENT ENDPOINTS ====================
+  /api/students/dashboard:
+    get:
+      summary: Get student dashboard
+      description: Retrieve dashboard data including stats, recent activities, and recommendations
+      tags: [Students]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Dashboard data retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          student:
+                            $ref: '#/components/schemas/Student'
+                          stats:
+                            type: object
+                            properties:
+                              totalApplications:
+                                type: integer
+                              activeInternships:
+                                type: integer
+                              completedInternships:
+                                type: integer
+                              totalCredits:
+                                type: number
+                              totalHours:
+                                type: number
+                          recentApplications:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Application'
+                          recommendedInternships:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Internship'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Students only
+
+  /api/students/internships:
+    get:
+      summary: Browse available internships
+      description: Get a list of available internships with filtering and pagination
+      tags: [Students]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: department
+          schema:
+            type: string
+          description: Filter by department
+        - in: query
+          name: location
+          schema:
+            type: string
+          description: Filter by location
+        - in: query
+          name: workMode
+          schema:
+            type: string
+            enum: [remote, onsite, hybrid]
+          description: Filter by work mode
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+          description: Page number
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+          description: Items per page
+      responses:
+        '200':
+          description: Internships retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Internship'
+                          pagination:
+                            $ref: '#/components/schemas/Pagination'
+
+  /api/students/internships/recommended:
+    get:
+      summary: Get recommended internships
+      description: Get personalized internship recommendations based on student profile
+      tags: [Students]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Recommendations retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          internships:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Internship'
+                          reasons:
+                            type: array
+                            items:
+                              type: string
+                            description: Reasons why these internships are recommended
+
+  /api/students/applications:
+    post:
+      summary: Apply to internship
+      description: Submit an application for an internship
+      tags: [Students]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [internshipId, coverLetter]
+              properties:
+                internshipId:
+                  type: string
+                  example: "INT-2024001"
+                coverLetter:
+                  type: string
+                  example: "I am writing to express my interest..."
+                resumeUrl:
+                  type: string
+                  format: uri
+                  example: "https://storage.example.com/resumes/resume.pdf"
+      responses:
+        '201':
+          description: Application submitted successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          application:
+                            $ref: '#/components/schemas/Application'
+        '400':
+          description: Validation error or internship not found
+        '409':
+          description: Already applied to this internship
+
+    get:
+      summary: Get my applications
+      description: Retrieve all applications submitted by the student
+      tags: [Students]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [pending, approved, rejected, shortlisted, withdrawn]
+          description: Filter by application status
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: Applications retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          applications:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Application'
+                          pagination:
+                            $ref: '#/components/schemas/Pagination'
+
+  /api/students/applications/{applicationId}:
+    delete:
+      summary: Withdraw application
+      description: Withdraw a submitted application
+      tags: [Students]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: applicationId
+          required: true
+          schema:
+            type: string
+          example: "APP-2024001"
+      responses:
+        '200':
+          description: Application withdrawn successfully
+        '404':
+          description: Application not found
+        '400':
+          description: Cannot withdraw application in current status
+
+  /api/students/modules/recommended:
+    get:
+      summary: Get recommended modules
+      description: Get learning modules recommended for the student
+      tags: [Students]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Recommended modules retrieved successfully
+
+  /api/students/modules/start:
+    post:
+      summary: Start a learning module
+      description: Begin working on a learning module
+      tags: [Students]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [moduleCode]
+              properties:
+                moduleCode:
+                  type: string
+                  example: "CS301"
+      responses:
+        '200':
+          description: Module started successfully
+
+  /api/students/modules/complete:
+    post:
+      summary: Complete a learning module
+      description: Mark a learning module as completed
+      tags: [Students]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [moduleCode]
+              properties:
+                moduleCode:
+                  type: string
+                  example: "CS301"
+                score:
+                  type: number
+                  minimum: 0
+                  maximum: 100
+                  example: 85
+      responses:
+        '200':
+          description: Module completed successfully
+
+  /api/students/interviews/start:
+    post:
+      summary: Start interview practice
+      description: Begin an AI-powered interview practice session
+      tags: [Students]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [domain, difficulty]
+              properties:
+                domain:
+                  type: string
+                  example: "Backend Development"
+                difficulty:
+                  type: string
+                  enum: [beginner, intermediate, advanced]
+                  example: "intermediate"
+      responses:
+        '201':
+          description: Interview session started successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          interviewId:
+                            type: string
+                          question:
+                            type: string
+        '429':
+          description: Rate limit exceeded (AI feature limit)
+
+  /api/students/interviews/answer:
+    post:
+      summary: Submit interview answer
+      description: Submit an answer to the current interview question
+      tags: [Students]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [interviewId, answer]
+              properties:
+                interviewId:
+                  type: string
+                  example: "INT-2024001"
+                answer:
+                  type: string
+                  example: "My answer to the question..."
+      responses:
+        '200':
+          description: Answer submitted successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          feedback:
+                            type: string
+                          nextQuestion:
+                            type: string
+                          score:
+                            type: number
+
+  /api/students/interviews/end:
+    post:
+      summary: End interview session
+      description: End the current interview practice session and get final feedback
+      tags: [Students]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [interviewId]
+              properties:
+                interviewId:
+                  type: string
+                  example: "INT-2024001"
+      responses:
+        '200':
+          description: Interview session ended successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          interviewId:
+                            type: string
+                          totalScore:
+                            type: number
+                            description: Overall interview score
+                          feedback:
+                            type: string
+                            description: Overall feedback and recommendations
+                          strengths:
+                            type: array
+                            items:
+                              type: string
+                            description: Identified strengths
+                          areasForImprovement:
+                            type: array
+                            items:
+                              type: string
+                            description: Areas that need improvement
+        '404':
+          description: Interview session not found
+        '400':
+          description: Interview session already ended
+
+  /api/students/interviews/history:
+    get:
+      summary: Get interview history
+      description: Retrieve all past interview practice sessions for the student
+      tags: [Students]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: domain
+          schema:
+            type: string
+          description: Filter by domain
+        - in: query
+          name: difficulty
+          schema:
+            type: string
+            enum: [beginner, intermediate, advanced]
+          description: Filter by difficulty level
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+          description: Page number
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+          description: Items per page
+      responses:
+        '200':
+          description: Interview history retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          interviews:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                interviewId:
+                                  type: string
+                                domain:
+                                  type: string
+                                difficulty:
+                                  type: string
+                                totalScore:
+                                  type: number
+                                completedAt:
+                                  type: string
+                                  format: date-time
+                                status:
+                                  type: string
+                                  enum: [in_progress, completed, abandoned]
+                          pagination:
+                            $ref: '#/components/schemas/Pagination'
+
+  /api/students/logbooks:
+    post:
+      summary: Submit logbook
+      description: Submit a weekly logbook entry
+      tags: [Students]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [internshipId, weekNumber, hoursWorked, activities]
+              properties:
+                internshipId:
+                  type: string
+                  example: "INT-2024001"
+                weekNumber:
+                  type: integer
+                  minimum: 1
+                  example: 1
+                startDate:
+                  type: string
+                  format: date
+                  example: "2024-01-01"
+                endDate:
+                  type: string
+                  format: date
+                  example: "2024-01-07"
+                hoursWorked:
+                  type: number
+                  minimum: 0
+                  example: 40
+                activities:
+                  type: string
+                  example: "This week I worked on..."
+                tasksCompleted:
+                  type: array
+                  items:
+                    type: string
+                  example: ["Task 1", "Task 2"]
+                skillsUsed:
+                  type: array
+                  items:
+                    type: string
+                  example: ["JavaScript", "React"]
+                challenges:
+                  type: string
+                  example: "Faced challenges with..."
+                learnings:
+                  type: string
+                  example: "Learned about..."
+      responses:
+        '201':
+          description: Logbook submitted successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          logbook:
+                            $ref: '#/components/schemas/Logbook'
+
+    get:
+      summary: Get my logbooks
+      description: Retrieve all logbooks submitted by the student
+      tags: [Students]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: internshipId
+          schema:
+            type: string
+          description: Filter by internship
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [pending, approved, revision_requested]
+          description: Filter by status
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: Logbooks retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          logbooks:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Logbook'
+                          pagination:
+                            $ref: '#/components/schemas/Pagination'
+
+  /api/students/credits:
+    get:
+      summary: Get credits summary
+      description: Retrieve student's credit summary and NEP 2020 compliance status
+      tags: [Students]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Credits summary retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          totalCredits:
+                            type: number
+                            example: 12.5
+                          totalHours:
+                            type: number
+                            example: 500
+                          internships:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                internshipId:
+                                  type: string
+                                credits:
+                                  type: number
+                                hours:
+                                  type: number
+                          nepCompliant:
+                            type: boolean
+                            description: Whether student meets NEP 2020 requirements
+
+  /api/students/reports/nep:
+    post:
+      summary: Generate NEP report
+      description: Generate a NEP 2020 compliant internship report
+      tags: [Students]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [internshipId]
+              properties:
+                internshipId:
+                  type: string
+                  example: "INT-2024001"
+      responses:
+        '202':
+          description: Report generation queued
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          jobId:
+                            type: string
+                            description: Job ID for tracking report generation
+        '400':
+          description: Invalid internship ID
+
+  /api/students/chatbot:
+    post:
+      summary: Chatbot query
+      description: Query the AI chatbot for internship and career guidance
+      tags: [Students]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query:
+                  type: string
+                  example: "What skills do I need for a backend developer internship?"
+      responses:
+        '200':
+          description: Chatbot response received
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          response:
+                            type: string
+        '429':
+          description: Rate limit exceeded (AI feature limit)
+
+  # ==================== COMPANY ENDPOINTS ====================
+  /api/companies/dashboard:
+    get:
+      summary: Get company dashboard
+      description: Retrieve company dashboard with stats and recent activities
+      tags: [Companies]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Dashboard data retrieved successfully
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Companies only
+
+  /api/companies/profile:
+    get:
+      summary: Get company profile
+      description: Retrieve company profile information
+      tags: [Companies]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          company:
+                            $ref: '#/components/schemas/Company'
+
+    patch:
+      summary: Update company profile
+      description: Update company profile information
+      tags: [Companies]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                companyName:
+                  type: string
+                website:
+                  type: string
+                  format: uri
+                phone:
+                  type: string
+                address:
+                  type: string
+                pointOfContact:
+                  type: object
+      responses:
+        '200':
+          description: Profile updated successfully
+
+  /api/companies/internships:
+    post:
+      summary: Create new internship
+      description: Create a new internship posting
+      tags: [Companies]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, description, department, duration, stipend, location, workMode, startDate, slots]
+              properties:
+                title:
+                  type: string
+                  example: "Full Stack Development Intern"
+                description:
+                  type: string
+                  example: "Join our dynamic team..."
+                department:
+                  type: string
+                  example: "Computer Science"
+                requiredSkills:
+                  type: array
+                  items:
+                    type: string
+                  example: ["JavaScript", "Node.js", "React"]
+                optionalSkills:
+                  type: array
+                  items:
+                    type: string
+                duration:
+                  type: string
+                  example: "6 months"
+                stipend:
+                  type: number
+                  example: 20000
+                location:
+                  type: string
+                  example: "Bangalore"
+                workMode:
+                  type: string
+                  enum: [remote, onsite, hybrid]
+                  example: "hybrid"
+                startDate:
+                  type: string
+                  format: date
+                  example: "2024-06-01"
+                applicationDeadline:
+                  type: string
+                  format: date
+                  example: "2024-05-15"
+                slots:
+                  type: integer
+                  minimum: 1
+                  example: 5
+                responsibilities:
+                  type: array
+                  items:
+                    type: string
+                learningOpportunities:
+                  type: array
+                  items:
+                    type: string
+                eligibilityRequirements:
+                  type: object
+                  properties:
+                    minYear:
+                      type: integer
+                    minReadinessScore:
+                      type: number
+                    requiredModules:
+                      type: array
+                      items:
+                        type: string
+      responses:
+        '201':
+          description: Internship created successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          internship:
+                            $ref: '#/components/schemas/Internship'
+
+    get:
+      summary: Get all company internships
+      description: Retrieve all internships posted by the company
+      tags: [Companies]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [draft, active, closed, completed]
+          description: Filter by status
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: Internships retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          internships:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Internship'
+                          pagination:
+                            $ref: '#/components/schemas/Pagination'
+
+  /api/companies/internships/{internshipId}:
+    put:
+      summary: Update internship
+      description: Update an existing internship posting
+      tags: [Companies]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: internshipId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                status:
+                  type: string
+                  enum: [draft, active, closed, completed]
+                slots:
+                  type: integer
+      responses:
+        '200':
+          description: Internship updated successfully
+        '404':
+          description: Internship not found
+
+    delete:
+      summary: Delete internship
+      description: Delete an internship posting
+      tags: [Companies]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: internshipId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Internship deleted successfully
+        '404':
+          description: Internship not found
+
+  /api/companies/internships/{internshipId}/applicants:
+    get:
+      summary: Get applicants for internship
+      description: Retrieve all applicants for a specific internship
+      tags: [Companies]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: internshipId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [pending, approved, rejected, shortlisted]
+          description: Filter by application status
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: Applicants retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          applications:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Application'
+                          pagination:
+                            $ref: '#/components/schemas/Pagination'
+
+  /api/companies/applications/review:
+    post:
+      summary: Review applications
+      description: Review and update application status
+      tags: [Companies]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [applicationIds, action]
+              properties:
+                applicationIds:
+                  type: array
+                  items:
+                    type: string
+                  example: ["APP-2024001", "APP-2024002"]
+                action:
+                  type: string
+                  enum: [approve, reject, shortlist]
+                  example: "approve"
+                feedback:
+                  type: string
+                  example: "Great candidate!"
+      responses:
+        '200':
+          description: Applications reviewed successfully
+
+  /api/companies/applications/shortlist:
+    post:
+      summary: Shortlist candidates
+      description: Shortlist candidates for further consideration
+      tags: [Companies]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [applicationIds]
+              properties:
+                applicationIds:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Candidates shortlisted successfully
+
+  /api/companies/applications/reject:
+    post:
+      summary: Reject candidates
+      description: Reject candidate applications
+      tags: [Companies]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [applicationIds, reason]
+              properties:
+                applicationIds:
+                  type: array
+                  items:
+                    type: string
+                reason:
+                  type: string
+                  example: "Does not meet requirements"
+      responses:
+        '200':
+          description: Candidates rejected successfully
+
+  /api/companies/interns/progress:
+    get:
+      summary: Get intern progress
+      description: Retrieve progress of all interns working with the company
+      tags: [Companies]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: internshipId
+          schema:
+            type: string
+          description: Filter by internship
+      responses:
+        '200':
+          description: Intern progress retrieved successfully
+
+  /api/companies/logbooks/{logbookId}/feedback:
+    post:
+      summary: Provide logbook feedback
+      description: Provide feedback on a student's logbook entry
+      tags: [Companies]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: logbookId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [feedback]
+              properties:
+                feedback:
+                  type: string
+                  example: "Great work this week!"
+                rating:
+                  type: number
+                  minimum: 1
+                  maximum: 5
+                  example: 5
+      responses:
+        '200':
+          description: Feedback provided successfully
+
+  /api/companies/internships/{internshipId}/complete:
+    post:
+      summary: Mark internship as complete
+      description: Mark an internship as completed and trigger credit processing
+      tags: [Companies]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: internshipId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Internship marked as complete
+
+  /api/companies/events:
+    post:
+      summary: Create event
+      description: Create a company event (workshop, webinar, etc.)
+      tags: [Companies]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, description, date]
+              properties:
+                title:
+                  type: string
+                  example: "Tech Workshop"
+                description:
+                  type: string
+                date:
+                  type: string
+                  format: date-time
+                location:
+                  type: string
+                type:
+                  type: string
+                  enum: [workshop, webinar, networking, other]
+      responses:
+        '201':
+          description: Event created successfully
+
+  /api/companies/challenges:
+    post:
+      summary: Create challenge
+      description: Create a coding challenge or project for students
+      tags: [Companies]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, description, difficulty]
+              properties:
+                title:
+                  type: string
+                  example: "Build a REST API"
+                description:
+                  type: string
+                difficulty:
+                  type: string
+                  enum: [beginner, intermediate, advanced]
+                deadline:
+                  type: string
+                  format: date-time
+                rewards:
+                  type: object
+      responses:
+        '201':
+          description: Challenge created successfully
+
+  # ==================== MENTOR ENDPOINTS ====================
+  /api/mentors/dashboard:
+    get:
+      summary: Get mentor dashboard
+      description: Retrieve mentor dashboard with pending reviews and statistics
+      tags: [Mentors]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Dashboard data retrieved successfully
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Mentors only
+
+  /api/mentors/applications/pending:
+    get:
+      summary: Get pending applications
+      description: Retrieve all pending applications requiring mentor approval
+      tags: [Mentors]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: Pending applications retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          applications:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Application'
+                          pagination:
+                            $ref: '#/components/schemas/Pagination'
+
+  /api/mentors/applications/{applicationId}:
+    get:
+      summary: Get application details
+      description: Retrieve detailed information about a specific application
+      tags: [Mentors]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: applicationId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Application details retrieved successfully
+        '404':
+          description: Application not found
+
+    post:
+      summary: Approve application
+      description: Approve a student application
+      tags: [Mentors]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: applicationId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                comments:
+                  type: string
+                  example: "Approved - Good candidate"
+      responses:
+        '200':
+          description: Application approved successfully
+
+  /api/mentors/applications/{applicationId}/reject:
+    post:
+      summary: Reject application
+      description: Reject a student application
+      tags: [Mentors]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: applicationId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason:
+                  type: string
+                  example: "Does not meet eligibility criteria"
+      responses:
+        '200':
+          description: Application rejected successfully
+
+  /api/mentors/logbooks/pending:
+    get:
+      summary: Get pending logbooks
+      description: Retrieve all pending logbooks requiring mentor review
+      tags: [Mentors]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: Pending logbooks retrieved successfully
+
+  /api/mentors/logbooks/{logbookId}:
+    get:
+      summary: Get logbook details
+      description: Retrieve detailed information about a specific logbook
+      tags: [Mentors]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: logbookId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Logbook details retrieved successfully
+        '404':
+          description: Logbook not found
+
+  /api/mentors/logbooks/{logbookId}/approve:
+    post:
+      summary: Approve logbook
+      description: Approve a student logbook entry
+      tags: [Mentors]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: logbookId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                comments:
+                  type: string
+                  example: "Good work this week"
+      responses:
+        '200':
+          description: Logbook approved successfully
+
+  /api/mentors/logbooks/{logbookId}/revision:
+    post:
+      summary: Request logbook revision
+      description: Request revisions to a student logbook entry
+      tags: [Mentors]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: logbookId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [feedback]
+              properties:
+                feedback:
+                  type: string
+                  example: "Please provide more details on the challenges faced"
+      responses:
+        '200':
+          description: Revision requested successfully
+
+  /api/mentors/skill-gaps:
+    get:
+      summary: Get skill gap analysis
+      description: Retrieve skill gap analysis for students in mentor's department
+      tags: [Mentors]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Skill gap analysis retrieved successfully
+
+  /api/mentors/department/performance:
+    get:
+      summary: Get department performance
+      description: Retrieve performance metrics for students in mentor's department
+      tags: [Mentors]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Department performance retrieved successfully
+
+  /api/mentors/interventions:
+    post:
+      summary: Create intervention
+      description: Create an intervention record for a student
+      tags: [Mentors]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [studentId, type, description]
+              properties:
+                studentId:
+                  type: string
+                  example: "STD-2024001"
+                type:
+                  type: string
+                  enum: [academic, behavioral, attendance, other]
+                  example: "academic"
+                description:
+                  type: string
+                  example: "Student needs additional support"
+                priority:
+                  type: string
+                  enum: [low, medium, high]
+                  example: "medium"
+      responses:
+        '201':
+          description: Intervention created successfully
+
+    get:
+      summary: Get all interventions
+      description: Retrieve all interventions created by the mentor
+      tags: [Mentors]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: studentId
+          schema:
+            type: string
+          description: Filter by student
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [open, resolved, closed]
+      responses:
+        '200':
+          description: Interventions retrieved successfully
+
+  /api/mentors/students/{studentId}/progress:
+    get:
+      summary: Get student progress
+      description: Retrieve detailed progress information for a specific student
+      tags: [Mentors]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: studentId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Student progress retrieved successfully
+        '404':
+          description: Student not found
+
+  # ==================== ADMIN ENDPOINTS ====================
+  /api/admins/dashboard:
+    get:
+      summary: Get admin dashboard
+      description: Retrieve admin dashboard with system-wide statistics
+      tags: [Admin]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Dashboard data retrieved successfully
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admins only
+
+  /api/admins/companies/pending:
+    get:
+      summary: Get pending companies
+      description: Retrieve all companies pending verification
+      tags: [Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: Pending companies retrieved successfully
+
+  /api/admins/companies/{companyId}:
+    get:
+      summary: Get company details
+      description: Retrieve detailed information about a specific company
+      tags: [Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: companyId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Company details retrieved successfully
+        '404':
+          description: Company not found
+
+  /api/admins/companies/{companyId}/verify:
+    post:
+      summary: Verify company
+      description: Verify and approve a company registration
+      tags: [Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: companyId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                comments:
+                  type: string
+                  example: "All documents verified"
+      responses:
+        '200':
+          description: Company verified successfully
+
+  /api/admins/companies/{companyId}/reject:
+    post:
+      summary: Reject company
+      description: Reject a company registration
+      tags: [Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: companyId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason:
+                  type: string
+                  example: "Invalid documents"
+      responses:
+        '200':
+          description: Company rejected successfully
+
+  /api/admins/companies/{companyId}/suspend:
+    post:
+      summary: Suspend company
+      description: Suspend a company account
+      tags: [Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: companyId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  example: "Violation of terms"
+      responses:
+        '200':
+          description: Company suspended successfully
+
+  /api/admins/students/import:
+    post:
+      summary: Bulk import students
+      description: Import multiple students from CSV or JSON
+      tags: [Admin]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [students]
+              properties:
+                students:
+                  type: array
+                  items:
+                    type: object
+                    required: [email, profile]
+                    properties:
+                      email:
+                        type: string
+                        format: email
+                      profile:
+                        type: object
+                        required: [name, department, year, college]
+      responses:
+        '202':
+          description: Import job queued
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          jobId:
+                            type: string
+                            description: Job ID for tracking import progress
+
+  /api/admins/students/import/{jobId}:
+    get:
+      summary: Get import job status
+      description: Check the status of a bulk student import job
+      tags: [Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: jobId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Import job status retrieved successfully
+        '404':
+          description: Job not found
+
+  /api/admins/mentors/assign:
+    post:
+      summary: Assign mentor to students
+      description: Assign a mentor to one or more students
+      tags: [Admin]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mentorId, studentIds]
+              properties:
+                mentorId:
+                  type: string
+                  example: "MEN-2024001"
+                studentIds:
+                  type: array
+                  items:
+                    type: string
+                  example: ["STD-2024001", "STD-2024002"]
+      responses:
+        '200':
+          description: Mentor assigned successfully
+
+  /api/admins/credits/process:
+    post:
+      summary: Process credits
+      description: Process and calculate credits for students (all or specific student)
+      tags: [Admin]
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                studentId:
+                  type: string
+                  description: Process credits for specific student, omit for all students
+                  example: "STD-2024001"
+      responses:
+        '202':
+          description: Credit processing queued
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          jobId:
+                            type: string
+
+  /api/admins/reports/system:
+    post:
+      summary: Generate system report
+      description: Generate a comprehensive system-wide report
+      tags: [Admin]
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                startDate:
+                  type: string
+                  format: date
+                endDate:
+                  type: string
+                  format: date
+                reportType:
+                  type: string
+                  enum: [summary, detailed, analytics]
+      responses:
+        '202':
+          description: Report generation queued
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          jobId:
+                            type: string
+
+  /api/admins/analytics/system:
+    get:
+      summary: Get system-wide analytics
+      description: Retrieve system-wide analytics and metrics
+      tags: [Admin]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Analytics retrieved successfully
+
+  /api/admins/analytics/college:
+    get:
+      summary: Get college analytics
+      description: Retrieve analytics for specific colleges or all colleges
+      tags: [Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: college
+          schema:
+            type: string
+          description: Filter by college name
+      responses:
+        '200':
+          description: College analytics retrieved successfully
+
+  /api/admins/system/health:
+    get:
+      summary: Get system health
+      description: Check system health status including database, Redis, and external services
+      tags: [Admin]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: System health status retrieved successfully
+
+  /api/admins/ai/usage:
+    get:
+      summary: Get AI usage statistics
+      description: Retrieve statistics on AI feature usage (interviews, chatbot, summaries)
+      tags: [Admin]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: AI usage statistics retrieved successfully
+

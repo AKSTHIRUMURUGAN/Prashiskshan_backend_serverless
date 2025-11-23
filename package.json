@@ -10,7 +10,8 @@
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand",
     "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
     "lint": "eslint .",
-    "format": "prettier . --write"
+    "format": "prettier . --write",
+    "build:openapi": "node ./scripts/build-openapi.mjs"
   },
   "keywords": [
     "prashiskshan",
@@ -51,10 +52,10 @@
     "multer": "^2.0.2",
     "papaparse": "^5.5.3",
     "pdfkit": "^0.17.2",
-    "swagger-jsdoc": "^6.2.8",
-    "swagger-ui-express": "^4.6.3",
     "rate-limit-redis": "^4.0.0",
     "redis": "^4.7.0",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1",
     "twilio": "^5.10.5",
     "winston": "^3.18.3"
   },

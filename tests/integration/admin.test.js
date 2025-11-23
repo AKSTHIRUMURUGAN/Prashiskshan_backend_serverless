@@ -427,8 +427,8 @@ describe("Admin Routes - CRUD Operations", () => {
       expect(response.body.success).toBe(true);
       expect(response.body.data.usage).toBeDefined();
       expect(response.body.data.costEstimateUSD).toBeDefined();
-    });
   });
+});
 
   describe("Authorization Tests", () => {
     it("should reject requests without authentication", async () => {

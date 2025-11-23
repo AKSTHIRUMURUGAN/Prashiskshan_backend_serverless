@@ -105,7 +105,7 @@ export const registerStudent = async (req, res, next) => {
       // Log analytics event (non-blocking)
       analyticsService
         .logEvent({ clientId: firebaseUser.uid, name: "sign_up", params: { method: "email" } })
-        .catch(() => {});
+        .catch(() => { });
 
       res.status(201).json(
         apiSuccess({ student: sanitizeDoc(student, "student"), firebaseUid: firebaseUser.uid }, "Student registered successfully"),
@@ -287,9 +287,9 @@ export const login = async (req, res, next) => {
       }
     }
 
-    res.json(apiSuccess({ user: sanitizeDoc(context.doc, context.role) }, "Login successful"));
+    res.json(apiSuccess({ user: sanitizeDoc(context.doc, context.role), idToken: usedIdToken }, "Login successful"));
     // Log analytics event for login (best-effort, non-blocking)
-    analyticsService.logEvent({ clientId: decoded.uid, name: "login", params: { method: usedIdToken ? "id_token" : "uid" } }).catch(() => {});
+    analyticsService.logEvent({ clientId: decoded.uid, name: "login", params: { method: usedIdToken ? "id_token" : "uid" } }).catch(() => { });
   } catch (error) {
     next(error);
   }
@@ -492,6 +492,203 @@ export const uploadResume = async (req, res, next) => {
     );
 
     res.json(apiSuccess({ resumeUrl: uploadResult.url, student: sanitizeDoc(student, "student") }, "Resume uploaded"));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const registerMentor = async (req, res, next) => {
+  try {
+    const { email, password, profile = {}, preferences } = req.body;
+
+    if (!email || !password) throw createHttpError(400, "Email and password are required");
+    const requiredProfileFields = ["name", "department"];
+    const missingFields = requiredProfileFields.filter((field) => !profile[field]);
+    if (missingFields.length) {
+      throw createHttpError(400, `Missing profile fields: ${missingFields.join(", ")}`);
+    }
+
+    const exists = await emailExists(email);
+    if (exists) throw createHttpError(409, "Email already registered");
+
+    let firebaseUser;
+    try {
+      firebaseUser = await firebaseAdmin.auth().createUser({
+        email,
+        password,
+        displayName: profile.name,
+      });
+    } catch (error) {
+      logger.error("Firebase mentor creation failed", error);
+      const code = error && (error.code || (error.errorInfo && error.errorInfo.code));
+      if (code === "auth/configuration-not-found") {
+        throw createHttpError(
+          502,
+          "Unable to create Firebase user: Email/Password provider not configured. Enable Email/Password sign-in in the Firebase Console or use the Firebase Auth emulator (set FIREBASE_AUTH_EMULATOR_HOST).",
+        );
+      }
+      throw createHttpError(502, "Unable to create Firebase user");
+    }
+
+    try {
+      const mentor = await Mentor.create({
+        mentorId: generateId("MEN"),
+        firebaseUid: firebaseUser.uid,
+        email,
+        profile: {
+          ...profile,
+        },
+        preferences: preferences || undefined,
+      });
+
+      // Create a Firebase custom token and set it as a cookie
+      try {
+        const customToken = await firebaseAdmin.auth().createCustomToken(firebaseUser.uid);
+        const cookieOpts = { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", maxAge: 7 * 24 * 60 * 60 * 1000 };
+        res.cookie("auth_token", customToken, cookieOpts);
+        logger.info("Set auth_token cookie for newly registered mentor", { uid: firebaseUser.uid });
+      } catch (tokenErr) {
+        logger.warn("Failed to create Firebase custom token for mentor", { error: tokenErr.message });
+      }
+
+      // Send email verification link (non-blocking)
+      (async () => {
+        try {
+          const actionCodeSettings = { url: `${config.app.frontendUrl}/auth/verify?uid=${firebaseUser.uid}`, handleCodeInApp: true };
+          const link = await firebaseAdmin.auth().generateEmailVerificationLink(email, actionCodeSettings);
+          await emailService.sendEmail({ to: email, subject: "Verify your email", html: `<p>Hi ${profile.name}, please verify your email by clicking <a href=\"${link}\">here</a>.</p>` });
+          logger.info("Sent verification email after mentor registration", { email });
+        } catch (err) {
+          logger.warn("Failed to send verification email after mentor registration", { error: err && err.message });
+        }
+      })();
+
+      res.status(201).json(apiSuccess({ mentor: sanitizeDoc(mentor, "mentor"), firebaseUid: firebaseUser.uid }, "Mentor registered successfully"));
+    } catch (error) {
+      await firebaseAdmin.auth().deleteUser(firebaseUser.uid);
+      throw error;
+    }
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const registerAdmin = async (req, res, next) => {
+  try {
+    const { email, password, name, role = "admin", permissions = [] } = req.body;
+
+    if (!email || !password || !name) throw createHttpError(400, "Email, password, and name are required");
+
+    // Only allow super_admin to create other admins, or allow in development
+    const isDevelopment = process.env.NODE_ENV !== "production";
+    if (!isDevelopment) {
+      try {
+        const context = await resolveUserFromRequest(req);
+        if (!context || context.role !== "admin") {
+          throw createHttpError(403, "Only admins can create admin accounts");
+        }
+        const adminDoc = context.doc;
+        if (!adminDoc || adminDoc.role !== "super_admin") {
+          throw createHttpError(403, "Only super admins can create admin accounts");
+        }
+      } catch (authError) {
+        // If authentication fails, only allow in development
+        if (!isDevelopment) {
+          throw createHttpError(403, "Admin registration requires authentication in production");
+        }
+      }
+    }
+
+    const exists = await emailExists(email);
+    if (exists) throw createHttpError(409, "Email already registered");
+
+    let firebaseUser;
+    try {
+      firebaseUser = await firebaseAdmin.auth().createUser({
+        email,
+        password,
+        displayName: name,
+      });
+    } catch (error) {
+      logger.error("Firebase admin creation failed", error);
+      const code = error && (error.code || (error.errorInfo && error.errorInfo.code));
+      if (code === "auth/configuration-not-found") {
+        throw createHttpError(
+          502,
+          "Unable to create Firebase user: Email/Password provider not configured. Enable Email/Password sign-in in the Firebase Console or use the Firebase Auth emulator (set FIREBASE_AUTH_EMULATOR_HOST).",
+        );
+      }
+      throw createHttpError(502, "Unable to create Firebase user");
+    }
+
+    try {
+      const admin = await Admin.create({
+        adminId: generateId("ADM"),
+        firebaseUid: firebaseUser.uid,
+        email,
+        name,
+        role,
+        permissions,
+      });
+
+      // Create a Firebase custom token and set it as a cookie
+      try {
+        const customToken = await firebaseAdmin.auth().createCustomToken(firebaseUser.uid);
+        const cookieOpts = { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", maxAge: 7 * 24 * 60 * 60 * 1000 };
+        res.cookie("auth_token", customToken, cookieOpts);
+        logger.info("Set auth_token cookie for newly registered admin", { uid: firebaseUser.uid });
+      } catch (tokenErr) {
+        logger.warn("Failed to create Firebase custom token for admin", { error: tokenErr.message });
+      }
+
+      // Send email verification link (non-blocking)
+      (async () => {
+        try {
+          const actionCodeSettings = { url: `${config.app.frontendUrl}/auth/verify?uid=${firebaseUser.uid}`, handleCodeInApp: true };
+          const link = await firebaseAdmin.auth().generateEmailVerificationLink(email, actionCodeSettings);
+          await emailService.sendEmail({ to: email, subject: "Verify your email", html: `<p>Hi ${name}, please verify your email by clicking <a href=\"${link}\">here</a>.</p>` });
+          logger.info("Sent verification email after admin registration", { email });
+        } catch (err) {
+          logger.warn("Failed to send verification email after admin registration", { error: err && err.message });
+        }
+      })();
+
+      res.status(201).json(apiSuccess({ admin: sanitizeDoc(admin, "admin"), firebaseUid: firebaseUser.uid }, "Admin registered successfully"));
+    } catch (error) {
+      await firebaseAdmin.auth().deleteUser(firebaseUser.uid);
+      throw error;
+    }
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const verifyEmail = async (req, res, next) => {
+  try {
+    const { oobCode } = req.query;
+    if (!oobCode) throw createHttpError(400, "Verification code (oobCode) is required");
+
+    // Verify the email using Firebase Admin
+    try {
+      // Firebase Admin doesn't have a direct method to verify email with oobCode
+      // The verification is typically handled client-side, but we can check if the user is verified
+      const actionCodeInfo = await firebaseAdmin.auth().checkActionCode(oobCode);
+      if (actionCodeInfo.operation !== "VERIFY_EMAIL") {
+        throw createHttpError(400, "Invalid verification code");
+      }
+
+      // Apply the action code to verify the email
+      await firebaseAdmin.auth().applyActionCode(oobCode);
+
+      res.json(apiSuccess({}, "Email verified successfully"));
+    } catch (error) {
+      logger.error("Email verification failed", error);
+      const code = error && (error.code || (error.errorInfo && error.errorInfo.code));
+      if (code === "auth/invalid-action-code" || code === "auth/expired-action-code") {
+        throw createHttpError(400, "Invalid or expired verification code");
+      }
+      throw createHttpError(500, "Failed to verify email");
+    }
   } catch (error) {
     next(error);
   }
