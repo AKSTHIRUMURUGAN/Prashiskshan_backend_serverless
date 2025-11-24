@@ -18,8 +18,8 @@ const ensureCompanyContext = async (req, { requireVerified = true } = {}) => {
 };
 
 const ensureInternshipOwnership = async (companyId, internshipId) => {
-  if (!mongoose.Types.ObjectId.isValid(internshipId)) throw createHttpError(400, "Invalid internship id");
-  const internship = await Internship.findOne({ _id: internshipId, companyId: companyId });
+  // internshipId is a custom string (e.g., INTERN-123), not an ObjectId
+  const internship = await Internship.findOne({ internshipId: internshipId, companyId: companyId });
   if (!internship) throw createHttpError(404, "Internship not found");
   return internship;
 };
