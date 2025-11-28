@@ -3,9 +3,6 @@ name: Deploy Backend to EC2
 on:
   push:
     branches: [ "main" ]
-    paths:
-      - 'backend/**'
-      - '.github/workflows/deploy.yml'
 
 jobs:
   build-and-push:
@@ -23,7 +20,7 @@ jobs:
     - name: Build and push Docker image
       uses: docker/build-push-action@v5
       with:
-        context: ./backend
+        context: .
         push: true
         tags: ${{ secrets.DOCKERHUB_USERNAME }}/prashiskshan-backend:latest
 
