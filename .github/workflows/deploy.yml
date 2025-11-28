@@ -35,15 +35,17 @@ jobs:
         username: ${{ secrets.EC2_USER }}
         key: ${{ secrets.EC2_SSH_KEY }}
         script: |
-          # Stop running container
+          # Login to Docker Hub
+          docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }}
+
+          # Stop old container
           docker stop prashiskshan-backend || true
           docker rm prashiskshan-backend || true
-          
+
           # Pull latest image
           docker pull thirumuruganaks/prashiskshan-backend:latest
-          
+
           # Run new container
-          # Note: Make sure .env file exists on the server or pass env vars here
           docker run -d \
             --name prashiskshan-backend \
             --restart unless-stopped \
