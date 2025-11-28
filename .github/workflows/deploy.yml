@@ -1,12 +1,13 @@
-name: Deploy Backend to EC2
+name: Deploy Backend to EC2 (Docker Compose)
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main" ]   # Trigger only on main
 
 jobs:
-  build-and-push:
+  build_and_push:
     runs-on: ubuntu-latest
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -17,7 +18,7 @@ jobs:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: Build and push Docker image
+    - name: Build and Push Docker Image
       uses: docker/build-push-action@v5
       with:
         context: .
@@ -25,30 +26,32 @@ jobs:
         tags: ${{ secrets.DOCKERHUB_USERNAME }}/prashiskshan-backend:latest
 
   deploy:
-    needs: build-and-push
+    needs: build_and_push
     runs-on: ubuntu-latest
+
     steps:
-    - name: Deploy to EC2
+    - name: Deploy on EC2 using Docker Compose
       uses: appleboy/ssh-action@v1.0.3
       with:
         host: ${{ secrets.EC2_HOST }}
         username: ${{ secrets.EC2_USER }}
         key: ${{ secrets.EC2_SSH_KEY }}
         script: |
-          # Login to Docker Hub
+          set -e
+
+          echo "👉 Logging into Docker Hub..."
           docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }}
 
-          # Stop old container
-          docker stop prashiskshan-backend || true
-          docker rm prashiskshan-backend || true
+          echo "👉 Moving into project directory..."
+          cd /home/${{ secrets.EC2_USER }}/prashiskshan-backend
 
-          # Pull latest image
-          docker pull thirumuruganaks/prashiskshan-backend:latest
+          echo "👉 Pulling newest images..."
+          docker compose pull
 
-          # Run new container
-          docker run -d \
-            --name prashiskshan-backend \
-            --restart unless-stopped \
-            -p 5000:5000 \
-            --env-file /home/${{ secrets.EC2_USER }}/prashiskshan-backend/.env \
-            thirumuruganaks/prashiskshan-backend:latest
+          echo "👉 Starting services..."
+          docker compose up -d
+
+          echo "👉 Removing old images..."
+          docker system prune -f
+
+          echo "🚀 Deployment completed successfully!"
