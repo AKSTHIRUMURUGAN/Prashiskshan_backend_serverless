@@ -40,7 +40,7 @@ jobs:
           docker rm prashiskshan-backend || true
           
           # Pull latest image
-          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/prashiskshan-backend:latest
+          docker pull thirumuruganaks/prashiskshan-backend:latest
           
           # Run new container
           # Note: Make sure .env file exists on the server or pass env vars here
@@ -49,4 +49,4 @@ jobs:
             --restart unless-stopped \
             -p 5000:5000 \
             --env-file /home/${{ secrets.EC2_USER }}/prashiskshan-backend/.env \
-            ${{ secrets.DOCKERHUB_USERNAME }}/prashiskshan-backend:latest
+            thirumuruganaks/prashiskshan-backend:latest
