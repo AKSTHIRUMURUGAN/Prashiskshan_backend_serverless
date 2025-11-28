@@ -16,9 +16,11 @@ export class AIInterviewBot {
   }
 
   async startInterview() {
-    const prompt = `You are conducting a mock interview for a ${this.domain} internship. Start with a professional greeting and ask the candidate to "Tell me about yourself" while referencing their department (${this.studentProfile?.department ||
-      "N/A"}) and year (${this.studentProfile?.year || "N/A"}).`;
-    const response = await aiService.generateContent(prompt, { model: "flash" });
+    const prompt = `You are conducting a mock interview for a ${this.domain} internship. The difficulty level is ${this.difficulty}.
+Start with a professional greeting and ask the candidate to "Tell me about yourself" while referencing their department (${this.studentProfile?.department ||
+      "N/A"}) and year (${this.studentProfile?.year || "N/A"}).
+Ensure the tone and complexity matches the ${this.difficulty} level.`;
+    const response = await aiService.generateContent(prompt, { model: "chat" });
     const text = response?.output || "Tell me about yourself.";
     this.history.push({ role: "model", parts: [{ text }] });
     this.questionCount = 1;
@@ -34,10 +36,11 @@ export class AIInterviewBot {
       return { finished: true, feedback };
     }
 
-    const prompt = `You are continuing a mock ${this.domain} interview. The candidate just answered: "${answer}".
-Provide a brief evaluation (one sentence) and ask the next question. Increase difficulty gradually for ${this.difficulty} level.`;
+    const prompt = `You are continuing a mock ${this.domain} interview at ${this.difficulty} level. The candidate just answered: "${answer}".
+Provide a brief evaluation (one sentence) and ask the next question.
+Ensure the question complexity is appropriate for a ${this.difficulty} candidate.`;
 
-    const response = await aiService.generateContent(prompt, { model: "flash" });
+    const response = await aiService.generateContent(prompt, { model: "chat" });
     const nextQuestion = response?.output || "Let's discuss your technical experience.";
     this.history.push({ role: "model", parts: [{ text: nextQuestion }], timestamp: new Date() });
 
@@ -53,7 +56,7 @@ Provide a brief evaluation (one sentence) and ask the next question. Increase di
     const prompt = `Summarize the mock interview for a ${this.domain} role. Provide JSON with fields:
 overallScore (0-100), strengths (array), improvements (array), skillGaps (array), technicalScore, communicationScore, confidenceScore, detailedAnalysis (string).`;
 
-    const result = await aiService.generateStructuredJSON(prompt, { model: "flash" });
+    const result = await aiService.generateStructuredJSON(prompt, { model: "reasoning" });
     return result;
   }
 

@@ -128,6 +128,69 @@ export const emailService = {
           subject: "Application submitted successfully",
           html: `<p>Hi ${data.studentName},</p><p>Your application for <strong>${data.internshipTitle}</strong> at ${data.companyName} has been received.</p>`,
         });
+      case "application-accepted":
+        return this.sendEmail({
+          to: data.email,
+          subject: "Congratulations! Application Accepted 🎉",
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #2563eb;">Congratulations!</h2>
+              <p>Hi ${data.studentName},</p>
+              <p>We are thrilled to inform you that your application for the internship role of <strong>${data.internshipTitle}</strong> at <strong>${data.companyName}</strong> has been accepted!</p>
+              
+              <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <h3 style="margin-top: 0; color: #1f2937;">Company Contact Details</h3>
+                <p style="margin: 5px 0;"><strong>Website:</strong> <a href="${data.companyWebsite}" target="_blank">${data.companyWebsite || 'N/A'}</a></p>
+                <p style="margin: 5px 0;"><strong>Mobile:</strong> ${data.companyMobile || 'N/A'}</p>
+                <p style="margin: 5px 0;"><strong>Email:</strong> <a href="mailto:${data.companyEmail}">${data.companyEmail}</a></p>
+              </div>
+
+              <p>The company will be in touch with you shortly regarding the next steps.</p>
+              <p>Best regards,<br/>Team Prashiskshan</p>
+            </div>
+          `,
+        });
+      case "application-shortlisted":
+        return this.sendEmail({
+          to: data.email,
+          subject: "Update: You have been Shortlisted! 🌟",
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #ca8a04;">Good News!</h2>
+              <p>Hi ${data.studentName},</p>
+              <p>We are pleased to inform you that your application for the internship role of <strong>${data.internshipTitle}</strong> at <strong>${data.companyName}</strong> has been <strong>shortlisted</strong>.</p>
+              
+              <p>This means your profile stood out, and you are moving to the next stage of the selection process.</p>
+              
+              <p>The company will review your application further and may contact you for an interview or additional assessment. Please keep an eye on your email and dashboard for updates.</p>
+
+              <p>Best regards,<br/>Team Prashiskshan</p>
+            </div>
+          `,
+        });
+      case "application-revoked":
+        return this.sendEmail({
+          to: data.email,
+          subject: "Important: Update on your Internship Application",
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #dc2626;">Application Status Update</h2>
+              <p>Hi ${data.studentName},</p>
+              <p>We regret to inform you that your acceptance for the internship role of <strong>${data.internshipTitle}</strong> at <strong>${data.companyName}</strong> has been <strong>revoked</strong>.</p>
+              
+              <div style="background-color: #fef2f2; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #fecaca;">
+                <h3 style="margin-top: 0; color: #991b1b;">Reason for Revocation</h3>
+                <p style="color: #7f1d1d;">${data.reason || 'Administrative decision'}</p>
+              </div>
+
+              <p>This decision may be due to document verification issues, changes in hiring requirements, or other administrative reasons.</p>
+              
+              <p>We understand this is disappointing news. We encourage you to continue applying for other opportunities on our platform.</p>
+
+              <p>Best regards,<br/>Team Prashiskshan</p>
+            </div>
+          `,
+        });
       default:
         return this.sendEmail(data);
     }

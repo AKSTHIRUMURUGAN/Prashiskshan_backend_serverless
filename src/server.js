@@ -44,6 +44,8 @@ app.get("/api/docs.json", (_req, res) => res.json(openapiSpec));
 
 app.use("/api", generalRateLimiter, apiRouter);
 
+
+
 app.use(errorHandler);
 
 const startServer = async () => {

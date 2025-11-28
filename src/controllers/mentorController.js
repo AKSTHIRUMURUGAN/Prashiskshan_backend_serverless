@@ -3,6 +3,7 @@ import Mentor from "../models/Mentor.js";
 import Student from "../models/Student.js";
 import Application from "../models/Application.js";
 import Logbook from "../models/Logbook.js";
+import CreditRequest from "../models/CreditRequest.js";
 import { skillGapAnalysisService } from "../services/skillGapAnalysisService.js";
 import { apiSuccess } from "../utils/apiResponse.js";
 import { createHttpError, resolveUserFromRequest } from "./helpers/context.js";
@@ -365,3 +366,66 @@ export const getStudentProgress = async (req, res, next) => {
   }
 };
 
+
+export const getMyStudents = async (req, res, next) => {
+  try {
+    const mentor = await ensureMentorContext(req);
+    const students = await Student.find({ "profile.department": mentor.profile.department })
+      .select("studentId profile.name profile.email profile.college readinessScore credits")
+      .lean();
+    res.json(apiSuccess(students, "Assigned students"));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getPendingCreditRequests = async (req, res, next) => {
+  try {
+    const mentor = await ensureMentorContext(req);
+    // Find requests from students in mentor's department
+    const students = await Student.find({ "profile.department": mentor.profile.department }).select("_id");
+    const studentIds = students.map((s) => s._id);
+
+    const requests = await CreditRequest.find({
+      status: "pending_mentor",
+      studentId: { $in: studentIds },
+    })
+      .populate("studentId", "profile.name profile.department")
+      .sort({ requestedAt: 1 })
+      .lean();
+
+    res.json(apiSuccess(requests, "Pending credit requests"));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const approveCreditRequest = async (req, res, next) => {
+  try {
+    const mentor = await ensureMentorContext(req);
+    const { requestId } = req.params;
+    const { action, reason } = req.body;
+
+    if (!["approve", "reject"].includes(action)) {
+      throw createHttpError(400, "Invalid action");
+    }
+
+    const request = await CreditRequest.findOne({ requestId });
+    if (!request) throw createHttpError(404, "Credit request not found");
+    if (request.status !== "pending_mentor") throw createHttpError(400, "Request not pending mentor review");
+
+    if (action === "approve") {
+      request.status = "pending_admin"; // Escalate to admin
+      request.mentorId = mentor.mentorId;
+    } else {
+      request.status = "rejected";
+      request.rejectionReason = reason;
+      request.mentorId = mentor.mentorId;
+    }
+
+    await request.save();
+    res.json(apiSuccess(request, `Credit request ${action}d`));
+  } catch (error) {
+    next(error);
+  }
+};

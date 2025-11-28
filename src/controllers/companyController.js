@@ -27,9 +27,18 @@ const ensureInternshipOwnership = async (companyId, internshipId) => {
 export const getCompanyDashboard = async (req, res, next) => {
   try {
     const company = await ensureCompanyContext(req);
-    const [activeInternships, totalApplications, studentsHired, pendingLogbooks] = await Promise.all([
+    const [
+      activeInternships,
+      totalInternships,
+      totalApplications,
+      pendingApplications,
+      studentsHired,
+      pendingLogbooks
+    ] = await Promise.all([
       Internship.countDocuments({ companyId: company._id, status: "approved" }),
+      Internship.countDocuments({ companyId: company._id }),
       Application.countDocuments({ companyId: company._id }),
+      Application.countDocuments({ companyId: company._id, status: "pending" }),
       InternshipCompletion.countDocuments({ companyId: company._id }),
       Logbook.countDocuments({ companyId: company._id, status: { $in: ["pending_company_review", "submitted"] } }),
     ]);
@@ -39,7 +48,9 @@ export const getCompanyDashboard = async (req, res, next) => {
           company,
           metrics: {
             activeInternships,
+            totalInternships,
             totalApplications,
+            pendingApplications,
             studentsHired,
             pendingLogbooks,
           },
@@ -137,6 +148,17 @@ export const getCompanyInternships = async (req, res, next) => {
     if (req.query.status) query.status = req.query.status;
     const internships = await Internship.find(query).sort({ createdAt: -1 }).lean();
     res.json(apiSuccess(internships, "Company internships"));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getInternshipById = async (req, res, next) => {
+  try {
+    const company = await ensureCompanyContext(req);
+    const { internshipId } = req.params;
+    const internship = await ensureInternshipOwnership(company._id, internshipId);
+    res.json(apiSuccess(internship, "Internship details"));
   } catch (error) {
     next(error);
   }
@@ -334,3 +356,167 @@ export const createChallenge = async (req, res, next) => {
   }
 };
 
+export const getCompanyApplications = async (req, res, next) => {
+  try {
+    const company = await ensureCompanyContext(req);
+    const { internshipId, status } = req.query;
+    const query = { companyId: company._id };
+
+    if (internshipId) {
+      if (mongoose.Types.ObjectId.isValid(internshipId)) {
+        query.internshipId = internshipId;
+      } else {
+        const internship = await Internship.findOne({ internshipId: internshipId, companyId: company._id });
+        if (internship) {
+          query.internshipId = internship._id;
+        } else {
+          return res.json(apiSuccess([], "Company applications"));
+        }
+      }
+    }
+
+    if (status) query.status = status;
+
+    const applications = await Application.find(query)
+      .populate("studentId", "profile.name profile.department profile.college profile.resume profile.skills profile.year")
+      .populate("internshipId", "title internshipId")
+      .sort({ appliedAt: -1 })
+      .lean();
+
+    res.json(apiSuccess(applications, "Company applications"));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getCompanyInterns = async (req, res, next) => {
+  try {
+    const company = await ensureCompanyContext(req);
+    const status = req.query.status || 'accepted';
+
+    // 1. Get all applications with specified status
+    const applications = await Application.find({
+      companyId: company._id,
+      status: status
+    })
+      .populate('studentId', 'profile.name profile.email')
+      .populate('internshipId', 'title')
+      .lean();
+
+    // 2. For each intern, fetch logbook stats
+    const internsWithStats = await Promise.all(applications.map(async (app) => {
+      const logbooks = await Logbook.find({
+        studentId: app.studentId._id,
+        internshipId: app.internshipId._id
+      }).lean();
+
+      const totalLogbooks = logbooks.length;
+      const submittedLogbooks = logbooks.filter(l => l.status === 'submitted' || l.status === 'approved').length;
+      const pendingLogbooks = logbooks.filter(l => l.status === 'submitted').length; // Pending company review
+
+      const approvedLogbooks = logbooks.filter(l => l.status === 'approved');
+      const totalHours = approvedLogbooks.reduce((sum, l) => sum + (l.hours || 0), 0);
+
+      // Calculate average rating from approved logbooks
+      const ratedLogbooks = approvedLogbooks.filter(l => l.companyRating);
+      const averageRating = ratedLogbooks.length > 0
+        ? ratedLogbooks.reduce((sum, l) => sum + l.companyRating, 0) / ratedLogbooks.length
+        : 0;
+
+      return {
+        _id: app.studentId._id, // Use student ID as key or application ID
+        applicationId: app._id,
+        studentName: app.studentId.profile.name,
+        internshipTitle: app.internshipId.title,
+        internshipId: app.internshipId._id,
+        status: app.status, // 'accepted'
+        startDate: app.updatedAt, // Approximate start date (when accepted)
+        logbooksSubmitted: submittedLogbooks,
+        pendingLogbooks: pendingLogbooks,
+        totalHours: totalHours,
+        averageRating: averageRating,
+        creditsEarned: 0 // Placeholder, logic for credits might be complex or in another model
+      };
+    }));
+
+    res.json(apiSuccess(internsWithStats, "Active interns fetched successfully"));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getCompanyInternLogbooks = async (req, res, next) => {
+  try {
+    const company = await ensureCompanyContext(req);
+    const { studentId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(studentId)) {
+      throw createHttpError(400, "Invalid studentId");
+    }
+
+    const logbooks = await Logbook.find({
+      studentId,
+      companyId: company._id,
+    })
+      .populate("internshipId", "title internshipId")
+      .sort({ weekNumber: 1 })
+      .lean();
+
+    res.json(apiSuccess(logbooks, "Intern logbooks"));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const completeInternship = async (req, res, next) => {
+  try {
+    const company = await ensureCompanyContext(req);
+    const { applicationId } = req.params;
+    const { feedback, overallScore } = req.body;
+
+    const application = await Application.findOne({
+      _id: applicationId,
+      companyId: company._id,
+      status: 'accepted'
+    });
+
+    if (!application) {
+      throw createHttpError(404, "Active internship application not found");
+    }
+
+    // Calculate totals from logbooks
+    const logbooks = await Logbook.find({
+      studentId: application.studentId,
+      internshipId: application.internshipId,
+      status: 'approved'
+    });
+
+    const totalHours = logbooks.reduce((sum, l) => sum + (l.hours || 0), 0);
+    // Simple credit calculation: 1 credit per 10 hours (example logic)
+    const creditsEarned = Math.floor(totalHours / 10);
+
+    // Create completion record
+    const completion = await InternshipCompletion.create({
+      completionId: `COMP-${Date.now()}`,
+      studentId: application.studentId,
+      internshipId: application.internshipId,
+      companyId: company._id,
+      totalHours,
+      creditsEarned,
+      completionDate: new Date(),
+      evaluation: {
+        companyScore: overallScore,
+        overallComments: feedback,
+      },
+      status: 'pending' // Pending admin/system verification if needed
+    });
+
+    // Update application status
+    application.status = 'completed';
+    await application.save();
+
+    res.json(apiSuccess(completion, "Internship marked as completed"));
+  } catch (error) {
+    next(error);
+  }
+};

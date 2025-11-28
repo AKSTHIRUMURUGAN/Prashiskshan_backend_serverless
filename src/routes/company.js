@@ -7,6 +7,7 @@ import {
   updateInternship,
   deleteInternship,
   getCompanyInternships,
+  getInternshipById,
   getApplicants,
   reviewApplications,
   shortlistCandidates,
@@ -16,6 +17,10 @@ import {
   markInternshipComplete,
   createEvent,
   createChallenge,
+  getCompanyApplications,
+  getCompanyInterns,
+  getCompanyInternLogbooks,
+  completeInternship,
 } from "../controllers/companyController.js";
 import { authenticate, identifyUser, authorize } from "../middleware/auth.js";
 import { internshipCreation, handleValidationErrors } from "../middleware/validation.js";
@@ -23,6 +28,28 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 
 const router = Router();
 const companyAuth = [authenticate, identifyUser, authorize("company")];
+
+/**
+ * @swagger
+ * /api/companies/applications:
+ *   get:
+ *     summary: Get company applications
+ *     tags: [Companies]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: internshipId
+ *         schema:
+ *           type: string
+ *         description: Filter by internship ID
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *         description: Filter by application status
+ */
+router.get("/applications", companyAuth, asyncHandler(getCompanyApplications));
 
 /**
  * @swagger
@@ -88,13 +115,24 @@ router.get("/internships", companyAuth, asyncHandler(getCompanyInternships));
 /**
  * @swagger
  * /api/companies/internships/{internshipId}:
- *   put:
+ *   get:
+ *     summary: Get internship by ID
+ *     tags: [Companies]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get("/internships/:internshipId", companyAuth, asyncHandler(getInternshipById));
+
+/**
+ * @swagger
+ * /api/companies/internships/{internshipId}:
+ *   patch:
  *     summary: Update internship
  *     tags: [Companies]
  *     security:
  *       - bearerAuth: []
  */
-router.put("/internships/:internshipId", companyAuth, asyncHandler(updateInternship));
+router.patch("/internships/:internshipId", companyAuth, asyncHandler(updateInternship));
 
 /**
  * @swagger
@@ -164,6 +202,17 @@ router.post("/applications/reject", companyAuth, asyncHandler(rejectCandidates))
 
 /**
  * @swagger
+ * /api/companies/interns:
+ *   get:
+ *     summary: Get active interns
+ *     tags: [Companies]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get("/interns", companyAuth, asyncHandler(getCompanyInterns));
+
+/**
+ * @swagger
  * /api/companies/interns/progress:
  *   get:
  *     summary: Get intern progress
@@ -172,6 +221,28 @@ router.post("/applications/reject", companyAuth, asyncHandler(rejectCandidates))
  *       - bearerAuth: []
  */
 router.get("/interns/progress", companyAuth, asyncHandler(getInternsProgress));
+
+/**
+ * @swagger
+ * /api/companies/interns/{studentId}/logbooks:
+ *   get:
+ *     summary: Get intern logbooks
+ *     tags: [Companies]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get("/interns/:studentId/logbooks", companyAuth, asyncHandler(getCompanyInternLogbooks));
+
+/**
+ * @swagger
+ * /api/companies/interns/{applicationId}/complete:
+ *   post:
+ *     summary: Mark internship as complete
+ *     tags: [Companies]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.post("/interns/:applicationId/complete", companyAuth, asyncHandler(completeInternship));
 
 /**
  * @swagger

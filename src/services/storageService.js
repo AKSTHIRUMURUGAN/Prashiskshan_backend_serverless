@@ -1,4 +1,4 @@
-import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { randomUUID } from "node:crypto";
 import s3Client from "../config/s3.js";
 import r2Client from "../config/r2.js";
@@ -55,6 +55,15 @@ export const storageService = {
       }),
     );
     return results;
+  },
+  async deleteFile(key, provider = "s3") {
+    const target = resolveProvider(provider);
+    const command = new DeleteObjectCommand({
+      Bucket: target.bucket,
+      Key: key,
+    });
+    await target.client.send(command);
+    logger.info(`Deleted file from ${provider}`, { key });
   },
 };
 

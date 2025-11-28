@@ -6,6 +6,7 @@ import Internship from "../models/Internship.js";
 import Application from "../models/Application.js";
 import Logbook from "../models/Logbook.js";
 import Report from "../models/Report.js";
+import CreditRequest from "../models/CreditRequest.js";
 import { apiSuccess } from "../utils/apiResponse.js";
 import { createHttpError, resolveUserFromRequest } from "./helpers/context.js";
 import config from "../config/index.js";
@@ -24,13 +25,26 @@ const ensureAdminContext = async (req) => {
 export const getAdminDashboard = async (req, res, next) => {
   try {
     await ensureAdminContext(req);
-    const [studentCount, mentorCount, companyCount, internshipCount, applicationCount, logbookPending] = await Promise.all([
+    const [
+      studentCount,
+      mentorCount,
+      companyCount,
+      internshipCount,
+      applicationCount,
+      logbookPending,
+      pendingVerifications,
+      verifiedCompanies,
+      rejectedCompanies,
+    ] = await Promise.all([
       Student.countDocuments(),
       Mentor.countDocuments(),
       Company.countDocuments(),
       Internship.countDocuments({ status: "approved" }),
       Application.countDocuments(),
       Logbook.countDocuments({ status: { $in: ["submitted", "pending_mentor_review", "pending_company_review"] } }),
+      Company.countDocuments({ status: "pending_verification" }),
+      Company.countDocuments({ status: "verified" }),
+      Company.countDocuments({ status: "rejected" }),
     ]);
 
     res.json(
@@ -43,7 +57,13 @@ export const getAdminDashboard = async (req, res, next) => {
             internships: internshipCount,
             applications: applicationCount,
           },
-          pendingLogbooks: logbookPending,
+          counts: {
+            pendingLogbooks: logbookPending,
+            pendingVerifications,
+            verifiedCompanies,
+            rejectedCompanies,
+            pendingCreditApprovals: 0, // Placeholder as logic is not yet implemented
+          },
         },
         "Admin dashboard",
       ),
@@ -61,6 +81,21 @@ export const getPendingCompanies = async (req, res, next) => {
     if (riskLevel) query["aiVerification.riskLevel"] = riskLevel;
     const companies = await Company.find(query).sort({ createdAt: -1 }).lean();
     res.json(apiSuccess(companies, "Pending companies"));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getCompanies = async (req, res, next) => {
+  try {
+    await ensureAdminContext(req);
+    const { status, riskLevel } = req.query;
+    const query = {};
+    if (status) query.status = status;
+    if (riskLevel) query["aiVerification.riskLevel"] = riskLevel;
+
+    const companies = await Company.find(query).sort({ createdAt: -1 }).lean();
+    res.json(apiSuccess(companies, "Companies list"));
   } catch (error) {
     next(error);
   }
@@ -242,14 +277,50 @@ export const assignMentor = async (req, res, next) => {
   }
 };
 
-export const processCredits = async (req, res, next) => {
+export const getPendingCreditApprovals = async (req, res, next) => {
   try {
     await ensureAdminContext(req);
-    const { studentId } = req.body;
-    const query = studentId ? { studentId } : {};
-    const logbooks = await Logbook.find({ ...query, status: "approved" }).lean();
-    const totalCredits = logbooks.reduce((sum, lb) => sum + (lb.mentorReview?.creditsApproved || 0), 0);
-    res.json(apiSuccess({ totalCredits, count: logbooks.length }, "Credits processed"));
+    const requests = await CreditRequest.find({ status: "pending_admin" })
+      .populate("studentId", "profile.name profile.department profile.college")
+      .sort({ requestedAt: 1 })
+      .lean();
+    res.json(apiSuccess(requests, "Pending credit requests"));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const approveCredits = async (req, res, next) => {
+  try {
+    const admin = await ensureAdminContext(req);
+    const { requestId } = req.params;
+    const { action, reason } = req.body; // action: 'approve' or 'reject'
+
+    if (!["approve", "reject"].includes(action)) {
+      throw createHttpError(400, "Invalid action");
+    }
+
+    const request = await CreditRequest.findOne({ requestId });
+    if (!request) throw createHttpError(404, "Credit request not found");
+    if (request.status !== "pending_admin") throw createHttpError(400, "Request already processed");
+
+    if (action === "approve") {
+      request.status = "approved";
+      request.approvedAt = new Date();
+      request.approvedBy = admin.adminId;
+
+      // Update student credits
+      await Student.findByIdAndUpdate(request.studentId, {
+        $inc: { "credits.approved": request.credits },
+      });
+    } else {
+      request.status = "rejected";
+      request.rejectionReason = reason;
+      request.approvedBy = admin.adminId; // Track who rejected it
+    }
+
+    await request.save();
+    res.json(apiSuccess(request, `Credit request ${action}d`));
   } catch (error) {
     next(error);
   }
@@ -343,3 +414,69 @@ export const getAIUsageStats = async (req, res, next) => {
   }
 };
 
+export const approveInternship = async (req, res, next) => {
+  try {
+    const admin = await ensureAdminContext(req);
+    const { internshipId } = req.params;
+
+    // internshipId is the custom string ID (e.g. INTERN-123)
+    const internship = await Internship.findOne({ internshipId });
+    if (!internship) throw createHttpError(404, "Internship not found");
+
+    internship.status = "approved";
+    internship.adminReview = {
+      reviewedBy: admin.adminId,
+      reviewedAt: new Date(),
+      decision: "approved",
+    };
+    await internship.save();
+
+    res.json(apiSuccess(internship, "Internship approved"));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const rejectInternship = async (req, res, next) => {
+  try {
+    const admin = await ensureAdminContext(req);
+    const { internshipId } = req.params;
+    const { reason } = req.body;
+
+    if (!reason) throw createHttpError(400, "Rejection reason is required");
+
+    const internship = await Internship.findOne({ internshipId });
+    if (!internship) throw createHttpError(404, "Internship not found");
+
+    internship.status = "rejected";
+    internship.adminReview = {
+      reviewedBy: admin.adminId,
+      reviewedAt: new Date(),
+      decision: "rejected",
+      comments: reason,
+    };
+    await internship.save();
+
+    res.json(apiSuccess(internship, "Internship rejected"));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getInternships = async (req, res, next) => {
+  try {
+    await ensureAdminContext(req);
+    const { status } = req.query;
+    const query = {};
+    if (status) query.status = status;
+
+    const internships = await Internship.find(query)
+      .sort({ createdAt: -1 })
+      .populate("companyId", "companyName industry") // Populate company details
+      .lean();
+
+    res.json(apiSuccess(internships, "Internships list"));
+  } catch (error) {
+    next(error);
+  }
+};

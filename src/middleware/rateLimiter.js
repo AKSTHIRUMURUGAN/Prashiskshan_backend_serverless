@@ -10,7 +10,7 @@ const createRedisStore = () =>
 
 const generalRateLimiter = rateLimit({
   windowMs: config.security.rateLimitWindowMs,
-  max: config.security.rateLimitMaxRequests,
+  max: process.env.NODE_ENV === 'development' ? 10000 : config.security.rateLimitMaxRequests,
   standardHeaders: true,
   legacyHeaders: false,
   store: createRedisStore(),
@@ -19,7 +19,7 @@ const generalRateLimiter = rateLimit({
 
 const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 5,
+  max: process.env.NODE_ENV === 'development' ? 1000 : 5,
   standardHeaders: true,
   legacyHeaders: false,
   store: createRedisStore(),
@@ -28,7 +28,7 @@ const authRateLimiter = rateLimit({
 
 const uploadRateLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  max: 20,
+  max: process.env.NODE_ENV === 'development' ? 1000 : 20,
   standardHeaders: true,
   legacyHeaders: false,
   store: createRedisStore(),

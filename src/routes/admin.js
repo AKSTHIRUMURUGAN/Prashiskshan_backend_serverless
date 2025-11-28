@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   getAdminDashboard,
   getPendingCompanies,
+  getCompanies,
   getCompanyDetails,
   verifyCompany,
   rejectCompany,
@@ -9,12 +10,16 @@ import {
   bulkImportStudents,
   getImportJobStatus,
   assignMentor,
-  processCredits,
   generateSystemReport,
   getAdminAnalytics,
   getCollegeAnalytics,
   getSystemHealth,
   getAIUsageStats,
+  approveInternship,
+  rejectInternship,
+  getInternships,
+  getPendingCreditApprovals,
+  approveCredits,
 } from "../controllers/adminController.js";
 import { authenticate, identifyUser, authorize } from "../middleware/auth.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
@@ -43,6 +48,17 @@ router.get("/dashboard", adminAuth, asyncHandler(getAdminDashboard));
  *       - bearerAuth: []
  */
 router.get("/companies/pending", adminAuth, asyncHandler(getPendingCompanies));
+
+/**
+ * @swagger
+ * /api/admins/companies:
+ *   get:
+ *     summary: Get companies (filter by status)
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get("/companies", adminAuth, asyncHandler(getCompanies));
 
 /**
  * @swagger
@@ -123,14 +139,25 @@ router.post("/mentors/assign", adminAuth, asyncHandler(assignMentor));
 
 /**
  * @swagger
- * /api/admins/credits/process:
- *   post:
- *     summary: Process credits
+ * /api/admins/credits/pending:
+ *   get:
+ *     summary: Get pending credit requests
  *     tags: [Admin]
  *     security:
  *       - bearerAuth: []
  */
-router.post("/credits/process", adminAuth, asyncHandler(processCredits));
+router.get("/credits/pending", adminAuth, asyncHandler(getPendingCreditApprovals));
+
+/**
+ * @swagger
+ * /api/admins/credits/{requestId}/decide:
+ *   post:
+ *     summary: Approve or reject credit request
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.post("/credits/:requestId/decide", adminAuth, asyncHandler(approveCredits));
 
 /**
  * @swagger
@@ -186,5 +213,38 @@ router.get("/system/health", adminAuth, asyncHandler(getSystemHealth));
  *       - bearerAuth: []
  */
 router.get("/ai/usage", adminAuth, asyncHandler(getAIUsageStats));
+
+/**
+ * @swagger
+ * /api/admins/internships/{internshipId}/approve:
+ *   post:
+ *     summary: Approve internship
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.post("/internships/:internshipId/approve", adminAuth, asyncHandler(approveInternship));
+
+/**
+ * @swagger
+ * /api/admins/internships/{internshipId}/reject:
+ *   post:
+ *     summary: Reject internship
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.post("/internships/:internshipId/reject", adminAuth, asyncHandler(rejectInternship));
+
+/**
+ * @swagger
+ * /api/admins/internships:
+ *   get:
+ *     summary: Get internships (filter by status)
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get("/internships", adminAuth, asyncHandler(getInternships));
 
 export default router;

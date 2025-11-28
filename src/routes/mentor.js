@@ -14,6 +14,9 @@ import {
   createIntervention,
   getInterventions,
   getStudentProgress,
+  getMyStudents,
+  getPendingCreditRequests,
+  approveCreditRequest,
 } from "../controllers/mentorController.js";
 import { authenticate, identifyUser, authorize } from "../middleware/auth.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
@@ -174,5 +177,38 @@ router.get("/interventions", mentorAuth, asyncHandler(getInterventions));
  *       - bearerAuth: []
  */
 router.get("/students/:studentId/progress", mentorAuth, asyncHandler(getStudentProgress));
+
+/**
+ * @swagger
+ * /api/mentors/students:
+ *   get:
+ *     summary: Get assigned students
+ *     tags: [Mentors]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get("/students", mentorAuth, asyncHandler(getMyStudents));
+
+/**
+ * @swagger
+ * /api/mentors/credits/pending:
+ *   get:
+ *     summary: Get pending credit requests
+ *     tags: [Mentors]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get("/credits/pending", mentorAuth, asyncHandler(getPendingCreditRequests));
+
+/**
+ * @swagger
+ * /api/mentors/credits/{requestId}/decide:
+ *   post:
+ *     summary: Approve (escalate) or reject credit request
+ *     tags: [Mentors]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.post("/credits/:requestId/decide", mentorAuth, asyncHandler(approveCreditRequest));
 
 export default router;

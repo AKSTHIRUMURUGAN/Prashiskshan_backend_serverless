@@ -51,6 +51,7 @@ Return JSON with criticalSkillGaps[{skill,count,severity}], trendAnalysis (strin
 
     try {
       const analysis = await aiService.generateStructuredJSON(prompt, {
+        model: "reasoning",
         feature: "skill_gap_dept",
         cacheKey,
         ttl: dayInSeconds,
@@ -84,7 +85,7 @@ Return JSON with criticalSkillGaps[{skill,count,severity}], trendAnalysis (strin
 Completed modules: ${JSON.stringify(student.completedModules)}
 Missing skills vs target internships: ${JSON.stringify(missingSkills)}
 Provide JSON { topGaps: array of {skill, reason}, careerPathRecommendations: array, suggestedModules: array with priority, estimatedTimeToReady (weeks) }.`;
-    return aiService.generateStructuredJSON(prompt, { feature: "skill_gap_student" });
+    return aiService.generateStructuredJSON(prompt, { model: "reasoning", feature: "skill_gap_student" });
   },
 
   async predictPlacementSuccess(studentId) {
@@ -110,7 +111,7 @@ Provide JSON { topGaps: array of {skill, reason}, careerPathRecommendations: arr
   async generateInterventionPlan(department, skillGaps) {
     const prompt = `Create an intervention plan for department ${department} targeting these skill gaps: ${JSON.stringify(skillGaps)}.
 Return JSON with workshops (array), modules (array), expertSessions (array), expectedImpact (string).`;
-    return aiService.generateStructuredJSON(prompt, { feature: "skill_gap_intervention" });
+    return aiService.generateStructuredJSON(prompt, { model: "reasoning", feature: "skill_gap_intervention" });
   },
 
   async trackSkillGapTrends(department, months = 6) {
@@ -148,7 +149,7 @@ Return JSON with workshops (array), modules (array), expertSessions (array), exp
 Active internships: ${JSON.stringify(internships.map((i) => ({ title: i.title, skills: i.requiredSkills })))}.
 Return JSON { readinessScore (0-100), summary, recommendations }.`;
     try {
-      return await aiService.generateStructuredJSON(prompt, { feature: "skill_gap_benchmark" });
+      return await aiService.generateStructuredJSON(prompt, { model: "reasoning", feature: "skill_gap_benchmark" });
     } catch (error) {
       logger.error("Industry benchmark AI failed", { error: error.message });
       return { readinessScore: 50, summary: "Insufficient AI data; default baseline applied.", recommendations: [] };

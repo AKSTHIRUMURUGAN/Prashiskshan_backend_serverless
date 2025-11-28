@@ -55,7 +55,7 @@ const internshipSchema = new Schema(
     eligibilityRequirements: eligibilitySchema,
     status: {
       type: String,
-      enum: ["draft", "pending_approval", "approved", "closed", "cancelled"],
+      enum: ["draft", "pending_approval", "approved", "closed", "cancelled", "rejected"],
       default: "pending_approval",
       index: true,
     },

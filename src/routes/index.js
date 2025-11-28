@@ -7,6 +7,14 @@ import adminRouter from "./admin.js";
 import testRouter from "./tests.js";
 import { apiSuccess, apiError } from "../utils/apiResponse.js";
 
+import internshipRouter from "./internship.js";
+
+import applicationRouter from "./application.js";
+import uploadRouter from "./upload.js";
+import logbookRouter from "./logbook.js";
+import notificationRouter from "./notification.js";
+import interviewRouter from "./interview.js";
+
 const router = Router();
 
 /**
@@ -46,7 +54,19 @@ router.use("/students", studentRouter);
 router.use("/mentors", mentorRouter);
 router.use("/companies", companyRouter);
 router.use("/admins", adminRouter);
+router.use("/internships", internshipRouter);
+router.use("/applications", applicationRouter);
+router.use("/upload", uploadRouter);
+router.use("/logbooks", logbookRouter);
+router.use("/notifications", notificationRouter);
+router.use("/interviews", interviewRouter);
 router.use("/tests", testRouter);
+
+// Cleanup Routes (Non-production only)
+import cleanupRouter from "./test.js";
+if (process.env.NODE_ENV !== "production") {
+  router.use("/test", cleanupRouter);
+}
 
 router.use((req, res) => {
   res.status(404).json(apiError("Route not found", { path: req.originalUrl }, { status: 404 }));

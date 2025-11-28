@@ -54,12 +54,17 @@ export const getStudentDashboard = async (req, res, next) => {
       recommendationService.getRecommendedInternships(student._id.toString(), []),
     ]);
 
+    const pendingLogbooks = logbooks.filter((lb) => lb.status === "draft" || lb.status === "submitted").length;
+
     const stats = applications.reduce(
       (acc, entry) => {
         acc[entry._id] = entry.count;
         return acc;
       },
-      { total: applications.reduce((sum, entry) => sum + entry.count, 0) },
+      {
+        total: applications.reduce((sum, entry) => sum + entry.count, 0),
+        pendingLogbooks
+      },
     );
 
     const deadlines = logbooks

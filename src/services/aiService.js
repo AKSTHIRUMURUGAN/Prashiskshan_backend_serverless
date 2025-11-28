@@ -1,17 +1,27 @@
-import { flashModel, proModel } from "../config/gemini.js";
+import { models } from "../config/gemini.js";
 import { get as redisGet, set as redisSet } from "../config/redis.js";
 import AiUsageLog from "../models/AiUsageLog.js";
 import { logger } from "../utils/logger.js";
 
 const MODEL_MAP = {
-  flash: flashModel,
-  pro: proModel,
+  ...models,
+  // Use case aliases
+  chat: models.flash,
+  reasoning: models.pro,
+  image: models.imagePro,
+  fastImage: models.imageFlash,
+  video: models.video,
+  tts: models.ttsPro,
+  fastTts: models.ttsFlash,
+  audio: models.audioNative,
 };
+
+import config from "../config/index.js";
 
 const DEFAULT_OPTIONS = {
   model: "flash",
   temperature: 0.5,
-  maxOutputTokens: 1024,
+  maxOutputTokens: config.gemini.maxOutputTokens,
 };
 
 const COST_PER_MILLION = {

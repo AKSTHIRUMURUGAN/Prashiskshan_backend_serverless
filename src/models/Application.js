@@ -55,7 +55,7 @@ const applicationSchema = new Schema(
     department: { type: String, required: true, index: true },
     status: {
       type: String,
-      enum: ["pending", "mentor_approved", "mentor_rejected", "shortlisted", "rejected", "accepted", "withdrawn"],
+      enum: ["pending", "mentor_approved", "mentor_rejected", "shortlisted", "rejected", "accepted", "withdrawn", "completed"],
       default: "pending",
       index: true,
     },
