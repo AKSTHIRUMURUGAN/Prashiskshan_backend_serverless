@@ -1,0 +1,55 @@
+name: Deploy Backend to EC2
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy.yml'
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./backend
+        push: true
+        tags: ${{ secrets.DOCKERHUB_USERNAME }}/prashiskshan-backend:latest
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+    - name: Deploy to EC2
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USER }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        script: |
+          # Stop running container
+          docker stop prashiskshan-backend || true
+          docker rm prashiskshan-backend || true
+          
+          # Pull latest image
+          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/prashiskshan-backend:latest
+          
+          # Run new container
+          # Note: Make sure .env file exists on the server or pass env vars here
+          docker run -d \
+            --name prashiskshan-backend \
+            --restart unless-stopped \
+            -p 5000:5000 \
+            --env-file /home/${{ secrets.EC2_USER }}/prashiskshan-backend/.env \
+            ${{ secrets.DOCKERHUB_USERNAME }}/prashiskshan-backend:latest
