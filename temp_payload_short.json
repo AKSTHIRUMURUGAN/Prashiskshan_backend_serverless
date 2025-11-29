@@ -1,0 +1,10 @@
+{
+    "email": "test_debug_short_pw@example.com",
+    "password": "123",
+    "profile": {
+        "name": "Test User",
+        "department": "CS",
+        "year": "3",
+        "college": "Test College"
+    }
+}

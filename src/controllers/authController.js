@@ -54,7 +54,7 @@ export const registerStudent = async (req, res, next) => {
           "Unable to create Firebase user: Email/Password provider not configured. Enable Email/Password sign-in in the Firebase Console or use the Firebase Auth emulator (set FIREBASE_AUTH_EMULATOR_HOST).",
         );
       }
-      throw createHttpError(502, "Unable to create Firebase user");
+      throw createHttpError(502, `Unable to create Firebase user: ${error.message}`);
     }
 
     try {
@@ -151,7 +151,7 @@ export const registerCompany = async (req, res, next) => {
           "Unable to create Firebase user: Email/Password provider not configured. Enable Email/Password sign-in in the Firebase Console or use the Firebase Auth emulator (set FIREBASE_AUTH_EMULATOR_HOST).",
         );
       }
-      throw createHttpError(502, "Unable to create Firebase user");
+      throw createHttpError(502, `Unable to create Firebase user: ${error.message}`);
     }
 
     try {
@@ -527,7 +527,7 @@ export const registerMentor = async (req, res, next) => {
           "Unable to create Firebase user: Email/Password provider not configured. Enable Email/Password sign-in in the Firebase Console or use the Firebase Auth emulator (set FIREBASE_AUTH_EMULATOR_HOST).",
         );
       }
-      throw createHttpError(502, "Unable to create Firebase user");
+      throw createHttpError(502, `Unable to create Firebase user: ${error.message}`);
     }
 
     try {
@@ -618,7 +618,7 @@ export const registerAdmin = async (req, res, next) => {
           "Unable to create Firebase user: Email/Password provider not configured. Enable Email/Password sign-in in the Firebase Console or use the Firebase Auth emulator (set FIREBASE_AUTH_EMULATOR_HOST).",
         );
       }
-      throw createHttpError(502, "Unable to create Firebase user");
+      throw createHttpError(502, `Unable to create Firebase user: ${error.message}`);
     }
 
     try {
