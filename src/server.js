@@ -16,7 +16,7 @@ import openapiSpec from "./docs/openapi.mjs";
 
 const app = express();
 app.set("trust proxy", 1);
-
+//cors options
 const corsOptions = {
   origin: config.app.frontendUrl,
   credentials: true,
