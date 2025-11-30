@@ -55,6 +55,9 @@ const startServer = async () => {
     const port = config.app.port || 5000;
     app.listen(port, () => {
       logger.info(`Prashiskshan API listening on port ${port}`);
+      logger.info(`Environment: ${config.app.env}`);
+      logger.info(`API URL: ${config.app.apiUrl}`);
+      logger.info(`Frontend URL: ${config.app.frontendUrl}`);
     });
   } catch (error) {
     logger.error("Failed to start server", { error: error.message });
