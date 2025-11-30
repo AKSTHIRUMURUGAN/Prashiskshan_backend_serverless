@@ -64,6 +64,11 @@ router.use("/tests", testRouter);
 
 // Cleanup Routes (Non-production only)
 import cleanupRouter from "./test.js";
+import debugRouter from "./debug.js";
+
+// Mount debug router (you can restrict this to non-production if desired, but useful for debugging now)
+router.use("/debug", debugRouter);
+
 if (process.env.NODE_ENV !== "production") {
   router.use("/test", cleanupRouter);
 }
