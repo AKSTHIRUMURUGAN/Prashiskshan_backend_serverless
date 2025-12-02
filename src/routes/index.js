@@ -14,6 +14,7 @@ import uploadRouter from "./upload.js";
 import logbookRouter from "./logbook.js";
 import notificationRouter from "./notification.js";
 import interviewRouter from "./interview.js";
+import metricsRouter from "./metrics.js";
 
 const router = Router();
 
@@ -61,6 +62,7 @@ router.use("/logbooks", logbookRouter);
 router.use("/notifications", notificationRouter);
 router.use("/interviews", interviewRouter);
 router.use("/tests", testRouter);
+router.use("/metrics", metricsRouter);
 
 // Cleanup Routes (Non-production only)
 import cleanupRouter from "./test.js";

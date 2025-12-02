@@ -2,6 +2,7 @@ import { Worker, QueueEvents } from "bullmq";
 import bullConnection from "../config/bullmq.js";
 import { notificationService } from "../services/notificationService.js";
 import { smsService } from "../services/smsService.js";
+import { creditReminderService } from "../services/creditReminderService.js";
 import { logger } from "../utils/logger.js";
 
 const NOTIFICATION_QUEUE = "notifications";
@@ -33,6 +34,20 @@ const jobHandlers = {
       type: data.type,
     });
     return { mocked: true };
+  },
+  "send-credit-reminders": async (data) => {
+    const { maxReminders = 3 } = data || {};
+    logger.info("Processing credit reminder job", { maxReminders });
+    const result = await creditReminderService.sendOverdueReminders({
+      maxReminders,
+      dryRun: false,
+    });
+    logger.info("Credit reminder job completed", {
+      totalOverdue: result.totalOverdue,
+      sent: result.sent,
+      failed: result.failed,
+    });
+    return result;
   },
 };
 

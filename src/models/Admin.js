@@ -10,6 +10,8 @@ const adminSchema = new Schema(
     name: { type: String, required: true },
     role: { type: String, enum: ["super_admin", "admin", "support"], default: "admin" },
     permissions: { type: [String], default: [] },
+    profileImage: String,
+    profileImageFileId: String, // ImageKit fileId for deletion
     lastLoginAt: Date,
     status: { type: String, enum: ["active", "inactive"], default: "active" },
   },

@@ -48,6 +48,308 @@ export const applicationSubmit = [
   body("coverLetter").isLength({ min: 100, max: 1000 }).withMessage("coverLetter must be 100-1000 characters"),
 ];
 
+// Custom URL validator that's more lenient for document URLs
+const isValidDocumentURL = (value) => {
+  if (!value) return true; // Allow empty/undefined
+  if (typeof value !== 'string') return false;
+  
+  // Check if it's a valid URL format
+  try {
+    const url = new URL(value);
+    // Allow http, https, and protocol-relative URLs
+    return url.protocol === 'http:' || url.protocol === 'https:' || value.startsWith('//');
+  } catch {
+    // If URL constructor fails, check if it's a valid-looking URL string
+    return /^(https?:)?\/\/.+\..+/.test(value);
+  }
+};
+
+export const companyProfileUpdate = [
+  body("companyName").optional().trim().isLength({ min: 2, max: 200 }).withMessage("Company name must be 2-200 characters"),
+  body("about").optional().trim().isLength({ max: 2000 }).withMessage("About must be less than 2000 characters"),
+  body("phone").optional().matches(/^[6-9]\d{9}$/).withMessage("Phone must be a valid Indian mobile number"),
+  body("website").optional().matches(/^https?:\/\/.+/i).withMessage("Website must be a valid URL"),
+  body("documents.gstCertificate")
+    .optional({ values: 'falsy' })
+    .custom(isValidDocumentURL)
+    .withMessage("GST Certificate must be a valid URL"),
+  body("documents.registrationCertificate")
+    .optional({ values: 'falsy' })
+    .custom(isValidDocumentURL)
+    .withMessage("Registration Certificate must be a valid URL"),
+  body("documents.addressProof")
+    .optional({ values: 'falsy' })
+    .custom(isValidDocumentURL)
+    .withMessage("Address Proof must be a valid URL"),
+  body("documents.additionalDocuments").optional().isArray({ max: 5 }).withMessage("Additional documents must be an array with maximum 5 items"),
+  body("documents.additionalDocuments.*.id").optional().notEmpty().withMessage("Document ID is required"),
+  body("documents.additionalDocuments.*.label").optional().trim().isLength({ min: 1, max: 100 }).withMessage("Document label must be 1-100 characters"),
+  body("documents.additionalDocuments.*.url")
+    .optional({ values: 'falsy' })
+    .custom(isValidDocumentURL)
+    .withMessage("Document URL must be valid"),
+  body("documents.additionalDocuments.*.uploadedAt").optional().isISO8601().withMessage("Upload date must be a valid ISO date"),
+];
+
+export const reappealSubmission = [
+  body("message")
+    .trim()
+    .notEmpty()
+    .withMessage("Reappeal message is required")
+    .isLength({ min: 10, max: 2000 })
+    .withMessage("Reappeal message must be between 10 and 2000 characters")
+    .matches(/\S/)
+    .withMessage("Reappeal message cannot be only whitespace"),
+];
+
+export const reappealApproval = [
+  body("feedback")
+    .optional()
+    .trim()
+    .isLength({ max: 1000 })
+    .withMessage("Feedback must be less than 1000 characters"),
+];
+
+export const reappealRejection = [
+  body("reason")
+    .trim()
+    .notEmpty()
+    .withMessage("Rejection reason is required")
+    .isLength({ min: 10, max: 1000 })
+    .withMessage("Rejection reason must be between 10 and 1000 characters"),
+  body("cooldownDays")
+    .optional()
+    .isInt({ min: 1, max: 365 })
+    .withMessage("Cooldown days must be between 1 and 365"),
+];
+
+/**
+ * Validate reappeal attachment file
+ * Must be called after multer middleware
+ */
+export const validateReappealAttachment = (req, res, next) => {
+  // If no file uploaded, continue
+  if (!req.file) {
+    return next();
+  }
+
+  const allowedMimeTypes = ["application/pdf", "image/jpeg", "image/png"];
+  const maxFileSize = 10 * 1024 * 1024; // 10MB
+
+  // Validate MIME type
+  if (!allowedMimeTypes.includes(req.file.mimetype)) {
+    return res.status(400).json({
+      success: false,
+      error: "ValidationError",
+      details: [
+        {
+          field: "attachment",
+          message: "Attachment must be PDF, JPG, or PNG",
+        },
+      ],
+    });
+  }
+
+  // Validate file size
+  if (req.file.size > maxFileSize) {
+    return res.status(400).json({
+      success: false,
+      error: "ValidationError",
+      details: [
+        {
+          field: "attachment",
+          message: "Attachment must be under 10MB",
+        },
+      ],
+    });
+  }
+
+  return next();
+};
+
+/**
+ * Validate company status for reappeal submission
+ * Must be called after authentication middleware
+ */
+export const validateReappealEligibility = async (req, res, next) => {
+  try {
+    // Import here to avoid circular dependency
+    const { resolveUserFromRequest } = await import("../controllers/helpers/context.js");
+    const context = await resolveUserFromRequest(req);
+
+    if (context.role !== "company") {
+      return res.status(403).json({
+        success: false,
+        error: "Forbidden",
+        message: "Company access required",
+      });
+    }
+
+    const company = context.doc;
+
+    // Check if there's already an active reappeal
+    if (company.status === "reappeal") {
+      return res.status(400).json({
+        success: false,
+        error: "Reappeal already submitted and under review",
+        message: "Reappeal already submitted and under review",
+      });
+    }
+
+    // Check if company is blocked
+    if (company.status !== "blocked") {
+      return res.status(400).json({
+        success: false,
+        error: "Only blocked companies can submit reappeals",
+        message: "Only blocked companies can submit reappeals",
+      });
+    }
+
+    // Check cooldown period
+    if (company.reappeal?.cooldownEndsAt && new Date() < company.reappeal.cooldownEndsAt) {
+      const cooldownDate = company.reappeal.cooldownEndsAt.toISOString();
+      return res.status(403).json({
+        success: false,
+        error: `Cannot submit reappeal until ${cooldownDate}`,
+        message: `Cannot submit reappeal until ${cooldownDate}`,
+        cooldownEndsAt: cooldownDate,
+      });
+    }
+
+    // Attach company to request for use in controller
+    req.company = company;
+    return next();
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const creditRequestCreation = [
+  body("internshipCompletionId")
+    .notEmpty()
+    .withMessage("internshipCompletionId is required")
+    .isMongoId()
+    .withMessage("internshipCompletionId must be a valid MongoDB ObjectId"),
+];
+
+export const creditRequestResubmission = [
+  body("notes")
+    .optional()
+    .trim()
+    .isLength({ max: 1000 })
+    .withMessage("Notes must be less than 1000 characters"),
+];
+
+export const mentorReviewSubmission = [
+  body("decision")
+    .notEmpty()
+    .withMessage("Decision is required")
+    .isIn(["approved", "rejected"])
+    .withMessage("Decision must be 'approved' or 'rejected'"),
+  body("feedback")
+    .if(body("decision").equals("rejected"))
+    .notEmpty()
+    .withMessage("Feedback is required when rejecting a credit request")
+    .trim()
+    .isLength({ min: 10, max: 2000 })
+    .withMessage("Feedback must be between 10 and 2000 characters"),
+  body("feedback")
+    .if(body("decision").equals("approved"))
+    .optional()
+    .trim()
+    .isLength({ max: 2000 })
+    .withMessage("Feedback must be less than 2000 characters"),
+  body("qualityCriteria")
+    .optional()
+    .isObject()
+    .withMessage("Quality criteria must be an object"),
+  body("qualityCriteria.logbookComplete")
+    .optional()
+    .isBoolean()
+    .withMessage("logbookComplete must be a boolean"),
+  body("qualityCriteria.reportQuality")
+    .optional()
+    .isBoolean()
+    .withMessage("reportQuality must be a boolean"),
+  body("qualityCriteria.learningOutcomes")
+    .optional()
+    .isBoolean()
+    .withMessage("learningOutcomes must be a boolean"),
+  body("qualityCriteria.companyEvaluation")
+    .optional()
+    .isBoolean()
+    .withMessage("companyEvaluation must be a boolean"),
+];
+
+export const adminReviewSubmission = [
+  body("decision")
+    .notEmpty()
+    .withMessage("Decision is required")
+    .isIn(["approved", "rejected"])
+    .withMessage("Decision must be 'approved' or 'rejected'"),
+  body("feedback")
+    .if(body("decision").equals("rejected"))
+    .notEmpty()
+    .withMessage("Feedback is required when rejecting a credit request")
+    .trim()
+    .isLength({ min: 10, max: 2000 })
+    .withMessage("Feedback must be between 10 and 2000 characters"),
+  body("feedback")
+    .if(body("decision").equals("approved"))
+    .optional()
+    .trim()
+    .isLength({ max: 2000 })
+    .withMessage("Feedback must be less than 2000 characters"),
+  body("complianceChecks")
+    .optional()
+    .isObject()
+    .withMessage("Compliance checks must be an object"),
+  body("complianceChecks.nepCompliant")
+    .optional()
+    .isBoolean()
+    .withMessage("nepCompliant must be a boolean"),
+  body("complianceChecks.documentationComplete")
+    .optional()
+    .isBoolean()
+    .withMessage("documentationComplete must be a boolean"),
+  body("complianceChecks.feesCleared")
+    .optional()
+    .isBoolean()
+    .withMessage("feesCleared must be a boolean"),
+  body("complianceChecks.departmentApproved")
+    .optional()
+    .isBoolean()
+    .withMessage("departmentApproved must be a boolean"),
+];
+
+export const adminHoldResolution = [
+  body("resolution")
+    .notEmpty()
+    .withMessage("Resolution description is required")
+    .trim()
+    .isLength({ min: 10, max: 1000 })
+    .withMessage("Resolution must be between 10 and 1000 characters"),
+  body("notes")
+    .optional()
+    .trim()
+    .isLength({ max: 1000 })
+    .withMessage("Notes must be less than 1000 characters"),
+];
+
+export const markCompletionCompleteValidation = [
+  body("evaluationScore")
+    .notEmpty()
+    .withMessage("evaluationScore is required")
+    .isFloat({ min: 0, max: 10 })
+    .withMessage("evaluationScore must be a number between 0 and 10"),
+  body("evaluationComments")
+    .trim()
+    .notEmpty()
+    .withMessage("evaluationComments is required")
+    .isLength({ min: 10, max: 1000 })
+    .withMessage("evaluationComments must be between 10 and 1000 characters"),
+];
+
 export const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req);
   if (errors.isEmpty()) return next();
@@ -57,10 +359,247 @@ export const handleValidationErrors = (req, res, next) => {
     message: err.msg,
   }));
 
+  // Use the first error message as the main error for better test compatibility
+  const firstError = formatted[0]?.message || "Validation failed";
+
   return res.status(400).json({
     success: false,
-    error: "ValidationError",
+    error: firstError,
+    message: firstError,
     details: formatted,
   });
 };
 
+
+/**
+ * Validate MongoDB ObjectId in route parameters
+ */
+export const validateObjectIdParam = (paramName = "id") => {
+  return (req, res, next) => {
+    const id = req.params[paramName];
+    
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: `${paramName} parameter is required`,
+          field: paramName,
+          timestamp: new Date().toISOString(),
+          requestId: req.requestId,
+        },
+      });
+    }
+
+    // Check if it's a valid MongoDB ObjectId (24 hex characters)
+    if (!/^[0-9a-fA-F]{24}$/.test(id)) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "INVALID_ID",
+          message: `${paramName} must be a valid MongoDB ObjectId`,
+          field: paramName,
+          timestamp: new Date().toISOString(),
+          requestId: req.requestId,
+        },
+      });
+    }
+
+    next();
+  };
+};
+
+/**
+ * Validate pagination query parameters
+ */
+export const validatePagination = (req, res, next) => {
+  const { page, limit } = req.query;
+
+  if (page !== undefined) {
+    const pageNum = parseInt(page, 10);
+    if (Number.isNaN(pageNum) || pageNum < 1) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "page must be a positive integer",
+          field: "page",
+          timestamp: new Date().toISOString(),
+          requestId: req.requestId,
+        },
+      });
+    }
+    req.query.page = pageNum;
+  }
+
+  if (limit !== undefined) {
+    const limitNum = parseInt(limit, 10);
+    if (Number.isNaN(limitNum) || limitNum < 1 || limitNum > 100) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "limit must be between 1 and 100",
+          field: "limit",
+          timestamp: new Date().toISOString(),
+          requestId: req.requestId,
+        },
+      });
+    }
+    req.query.limit = limitNum;
+  }
+
+  next();
+};
+
+/**
+ * Validate credit request status filter
+ */
+export const validateStatusFilter = (req, res, next) => {
+  const { status } = req.query;
+
+  if (status !== undefined) {
+    const validStatuses = [
+      "pending_student_action",
+      "pending_mentor_review",
+      "mentor_approved",
+      "mentor_rejected",
+      "pending_admin_review",
+      "admin_approved",
+      "admin_rejected",
+      "credits_added",
+      "completed",
+    ];
+
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: `status must be one of: ${validStatuses.join(", ")}`,
+          field: "status",
+          timestamp: new Date().toISOString(),
+          requestId: req.requestId,
+        },
+      });
+    }
+  }
+
+  next();
+};
+
+/**
+ * Validate date range query parameters
+ */
+export const validateDateRange = (req, res, next) => {
+  const { startDate, endDate } = req.query;
+
+  if (startDate !== undefined) {
+    const start = new Date(startDate);
+    if (Number.isNaN(start.getTime())) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "startDate must be a valid ISO date string",
+          field: "startDate",
+          timestamp: new Date().toISOString(),
+          requestId: req.requestId,
+        },
+      });
+    }
+    req.query.startDate = start;
+  }
+
+  if (endDate !== undefined) {
+    const end = new Date(endDate);
+    if (Number.isNaN(end.getTime())) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "endDate must be a valid ISO date string",
+          field: "endDate",
+          timestamp: new Date().toISOString(),
+          requestId: req.requestId,
+        },
+      });
+    }
+    req.query.endDate = end;
+  }
+
+  if (startDate && endDate && req.query.startDate > req.query.endDate) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "startDate must be before endDate",
+        timestamp: new Date().toISOString(),
+        requestId: req.requestId,
+      },
+    });
+  }
+
+  next();
+};
+
+/**
+ * Validate sort query parameter
+ */
+export const validateSort = (allowedFields = []) => {
+  return (req, res, next) => {
+    const { sortBy, sortOrder } = req.query;
+
+    if (sortBy !== undefined) {
+      if (allowedFields.length > 0 && !allowedFields.includes(sortBy)) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: `sortBy must be one of: ${allowedFields.join(", ")}`,
+            field: "sortBy",
+            timestamp: new Date().toISOString(),
+            requestId: req.requestId,
+          },
+        });
+      }
+    }
+
+    if (sortOrder !== undefined) {
+      if (!["asc", "desc"].includes(sortOrder.toLowerCase())) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "sortOrder must be 'asc' or 'desc'",
+            field: "sortOrder",
+            timestamp: new Date().toISOString(),
+            requestId: req.requestId,
+          },
+        });
+      }
+      req.query.sortOrder = sortOrder.toLowerCase();
+    }
+
+    next();
+  };
+};
+
+/**
+ * Catch-all validation error handler for unexpected errors
+ */
+export const catchValidationErrors = (err, req, res, next) => {
+  if (err.name === "ValidationError") {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: err.message,
+        details: err.errors,
+        timestamp: new Date().toISOString(),
+        requestId: req.requestId,
+      },
+    });
+  }
+  next(err);
+};

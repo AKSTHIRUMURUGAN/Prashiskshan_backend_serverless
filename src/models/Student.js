@@ -38,11 +38,23 @@ const certificationSchema = new Schema(
   { _id: false },
 );
 
+const creditHistorySchema = new Schema(
+  {
+    creditRequestId: { type: Schema.Types.ObjectId, ref: "CreditRequest" },
+    internshipId: { type: Schema.Types.ObjectId, ref: "Internship" },
+    creditsAdded: Number,
+    addedAt: Date,
+    certificateUrl: String,
+  },
+  { _id: false },
+);
+
 const creditSchema = new Schema(
   {
     earned: { type: Number, default: 0 },
     approved: { type: Number, default: 0 },
     pending: { type: Number, default: 0 },
+    history: { type: [creditHistorySchema], default: [] },
   },
   { _id: false },
 );
@@ -60,6 +72,7 @@ const profileSchema = new Schema(
     interests: { type: [String], default: [] },
     resume: String,
     profileImage: String,
+    profileImageFileId: String, // ImageKit fileId for deletion
   },
   { _id: false },
 );

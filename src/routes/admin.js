@@ -6,6 +6,7 @@ import {
   getCompanyDetails,
   verifyCompany,
   rejectCompany,
+  blockCompany,
   suspendCompany,
   bulkImportStudents,
   getImportJobStatus,
@@ -19,10 +20,34 @@ import {
   rejectInternship,
   getInternships,
   getPendingCreditApprovals,
-  approveCredits,
+  getCreditRequestDetails,
+  submitAdminReview,
+  resolveAdminHold,
+  getCreditAnalytics,
+  exportCreditReport,
+  getBottleneckAnalysis,
+  getReappeals,
+  approveReappeal,
+  rejectReappeal,
+  getReminderStats,
+  sendOverdueReminders,
+  scheduleReminderJob,
+  getOverdueCreditRequests,
 } from "../controllers/adminController.js";
 import { authenticate, identifyUser, authorize } from "../middleware/auth.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { 
+  reappealApproval, 
+  reappealRejection, 
+  adminReviewSubmission,
+  adminHoldResolution,
+  handleValidationErrors,
+  validateObjectIdParam,
+  validatePagination,
+  validateStatusFilter,
+  validateDateRange,
+  validateSort,
+} from "../middleware/validation.js";
 
 const router = Router();
 const adminAuth = [authenticate, identifyUser, authorize("admin")];
@@ -95,6 +120,17 @@ router.post("/companies/:companyId/reject", adminAuth, asyncHandler(rejectCompan
 
 /**
  * @swagger
+ * /api/admins/companies/:companyId/block:
+ *   post:
+ *     summary: Block a company
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.post("/companies/:companyId/block", adminAuth, asyncHandler(blockCompany));
+
+/**
+ * @swagger
  * /api/admins/companies/{companyId}/suspend:
  *   post:
  *     summary: Suspend company
@@ -139,25 +175,160 @@ router.post("/mentors/assign", adminAuth, asyncHandler(assignMentor));
 
 /**
  * @swagger
- * /api/admins/credits/pending:
+ * /api/admins/credit-requests/pending:
  *   get:
- *     summary: Get pending credit requests
- *     tags: [Admin]
+ *     summary: Get pending credit requests for admin approval
+ *     tags: [Admin - Credit Transfer]
  *     security:
  *       - bearerAuth: []
  */
-router.get("/credits/pending", adminAuth, asyncHandler(getPendingCreditApprovals));
+router.get(
+  "/credit-requests/pending", 
+  adminAuth, 
+  validatePagination,
+  validateStatusFilter,
+  validateSort(["requestedAt", "status", "mentorId", "studentId"]),
+  asyncHandler(getPendingCreditApprovals)
+);
 
 /**
  * @swagger
- * /api/admins/credits/{requestId}/decide:
- *   post:
- *     summary: Approve or reject credit request
- *     tags: [Admin]
+ * /api/admins/credit-requests/{requestId}:
+ *   get:
+ *     summary: Get credit request details for admin review
+ *     tags: [Admin - Credit Transfer]
  *     security:
  *       - bearerAuth: []
  */
-router.post("/credits/:requestId/decide", adminAuth, asyncHandler(approveCredits));
+router.get(
+  "/credit-requests/:requestId", 
+  adminAuth, 
+  validateObjectIdParam("requestId"),
+  asyncHandler(getCreditRequestDetails)
+);
+
+/**
+ * @swagger
+ * /api/admins/credit-requests/{requestId}/review:
+ *   post:
+ *     summary: Submit admin review (approve/reject)
+ *     tags: [Admin - Credit Transfer]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.post(
+  "/credit-requests/:requestId/review", 
+  adminAuth, 
+  validateObjectIdParam("requestId"),
+  adminReviewSubmission,
+  handleValidationErrors,
+  asyncHandler(submitAdminReview)
+);
+
+/**
+ * @swagger
+ * /api/admins/credit-requests/{requestId}/resolve:
+ *   post:
+ *     summary: Resolve administrative hold on credit request
+ *     tags: [Admin - Credit Transfer]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.post(
+  "/credit-requests/:requestId/resolve", 
+  adminAuth,
+  validateObjectIdParam("requestId"),
+  adminHoldResolution,
+  handleValidationErrors,
+  asyncHandler(resolveAdminHold)
+);
+
+/**
+ * @swagger
+ * /api/admins/credit-requests/analytics:
+ *   get:
+ *     summary: Get system-wide credit transfer analytics
+ *     tags: [Admin - Credit Transfer]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get(
+  "/credit-requests/analytics", 
+  adminAuth, 
+  validateDateRange,
+  asyncHandler(getCreditAnalytics)
+);
+
+/**
+ * @swagger
+ * /api/admins/credit-requests/export:
+ *   get:
+ *     summary: Export credit transfer report (CSV/JSON)
+ *     tags: [Admin - Credit Transfer]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get(
+  "/credit-requests/export", 
+  adminAuth, 
+  validateDateRange,
+  asyncHandler(exportCreditReport)
+);
+
+/**
+ * @swagger
+ * /api/admins/credit-requests/bottlenecks:
+ *   get:
+ *     summary: Get approval pipeline bottleneck analysis
+ *     tags: [Admin - Credit Transfer]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get("/credit-requests/bottlenecks", adminAuth, asyncHandler(getBottleneckAnalysis));
+
+/**
+ * @swagger
+ * /api/admins/credit-requests/overdue:
+ *   get:
+ *     summary: Get all overdue credit requests
+ *     tags: [Admin - Credit Transfer]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get("/credit-requests/overdue", adminAuth, asyncHandler(getOverdueCreditRequests));
+
+/**
+ * @swagger
+ * /api/admins/credit-requests/reminders/stats:
+ *   get:
+ *     summary: Get reminder statistics for overdue credit requests
+ *     tags: [Admin - Credit Transfer]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get("/credit-requests/reminders/stats", adminAuth, asyncHandler(getReminderStats));
+
+/**
+ * @swagger
+ * /api/admins/credit-requests/reminders/send:
+ *   post:
+ *     summary: Manually trigger sending reminders for overdue credit requests
+ *     tags: [Admin - Credit Transfer]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.post("/credit-requests/reminders/send", adminAuth, asyncHandler(sendOverdueReminders));
+
+/**
+ * @swagger
+ * /api/admins/credit-requests/reminders/schedule:
+ *   post:
+ *     summary: Schedule automatic reminder job
+ *     tags: [Admin - Credit Transfer]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.post("/credit-requests/reminders/schedule", adminAuth, asyncHandler(scheduleReminderJob));
 
 /**
  * @swagger
@@ -246,5 +417,50 @@ router.post("/internships/:internshipId/reject", adminAuth, asyncHandler(rejectI
  *       - bearerAuth: []
  */
 router.get("/internships", adminAuth, asyncHandler(getInternships));
+
+/**
+ * @swagger
+ * /api/admins/reappeals:
+ *   get:
+ *     summary: Get all reappeal requests with filtering
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get("/reappeals", adminAuth, asyncHandler(getReappeals));
+
+/**
+ * @swagger
+ * /api/admins/reappeals/{companyId}/approve:
+ *   post:
+ *     summary: Approve a reappeal request
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.post(
+  "/reappeals/:companyId/approve", 
+  adminAuth, 
+  reappealApproval, 
+  handleValidationErrors, 
+  asyncHandler(approveReappeal)
+);
+
+/**
+ * @swagger
+ * /api/admins/reappeals/{companyId}/reject:
+ *   post:
+ *     summary: Reject a reappeal request
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.post(
+  "/reappeals/:companyId/reject", 
+  adminAuth, 
+  reappealRejection, 
+  handleValidationErrors, 
+  asyncHandler(rejectReappeal)
+);
 
 export default router;

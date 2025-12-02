@@ -7,6 +7,23 @@ import Student from "../models/Student.js";
 import InternshipCompletion from "../models/InternshipCompletion.js";
 import { apiSuccess } from "../utils/apiResponse.js";
 import { createHttpError, resolveUserFromRequest } from "./helpers/context.js";
+import { logger } from "../utils/logger.js";
+
+/**
+ * Extract storage key from R2 public URL
+ * @param {string} url - The full R2 public URL
+ * @returns {string|null} - The storage key or null if extraction fails
+ */
+const extractKeyFromUrl = (url) => {
+  try {
+    const urlObj = new URL(url);
+    // Remove leading slash from pathname to get the key
+    return urlObj.pathname.substring(1);
+  } catch (error) {
+    logger.warn("Failed to extract key from URL", { url, error: error.message });
+    return null;
+  }
+};
 
 const ensureCompanyContext = async (req, { requireVerified = true } = {}) => {
   const context = await resolveUserFromRequest(req);
@@ -75,7 +92,7 @@ export const getCompanyProfile = async (req, res, next) => {
 export const updateCompanyProfile = async (req, res, next) => {
   try {
     const company = await ensureCompanyContext(req, { requireVerified: false });
-    const allowedFields = ["phone", "address", "pointOfContact", "website", "documents"];
+    const allowedFields = ["companyName", "about", "logoUrl", "phone", "address", "pointOfContact", "website", "documents"];
     const updates = {};
     allowedFields.forEach((field) => {
       if (req.body[field] !== undefined) updates[field] = req.body[field];
@@ -516,6 +533,374 @@ export const completeInternship = async (req, res, next) => {
     await application.save();
 
     res.json(apiSuccess(completion, "Internship marked as completed"));
+  } catch (error) {
+    next(error);
+  }
+};
+export const reAppeal = async (req, res, next) => {
+  try {
+    const context = await resolveUserFromRequest(req);
+    if (context.role !== "company") {
+      throw createHttpError(403, "Company access required");
+    }
+
+    const company = context.doc;
+
+    if (company.status !== "rejected" && company.status !== "blocked") {
+      throw createHttpError(400, "Only rejected or blocked companies can re-appeal");
+    }
+
+    const updatedCompany = await Company.findByIdAndUpdate(
+      company._id,
+      {
+        status: "pending_verification",
+        "adminReview.decision": "pending",
+      },
+      { new: true, runValidators: false }
+    );
+
+    res.json(apiSuccess(updatedCompany, "Re-appeal submitted successfully"));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const submitReappeal = async (req, res, next) => {
+  try {
+    const context = await resolveUserFromRequest(req);
+    if (context.role !== "company") {
+      throw createHttpError(403, "Company access required");
+    }
+
+    const company = context.doc;
+
+    // Check if there's already an active reappeal
+    if (company.status === "reappeal") {
+      throw createHttpError(400, "Reappeal already submitted and under review");
+    }
+
+    // Check if company is blocked
+    if (company.status !== "blocked") {
+      throw createHttpError(400, "Only blocked companies can submit reappeals");
+    }
+
+    // Check cooldown period
+    if (company.reappeal?.cooldownEndsAt && new Date() < company.reappeal.cooldownEndsAt) {
+      const cooldownDate = company.reappeal.cooldownEndsAt.toISOString();
+      throw createHttpError(403, `Cannot submit reappeal until ${cooldownDate}`);
+    }
+
+    // Validate message
+    const { message } = req.body;
+    if (!message || typeof message !== "string") {
+      throw createHttpError(400, "Reappeal message is required");
+    }
+
+    const trimmedMessage = message.trim();
+    if (trimmedMessage.length < 10 || trimmedMessage.length > 2000) {
+      throw createHttpError(400, "Reappeal message must be between 10 and 2000 characters");
+    }
+
+    // Handle file upload if present
+    let attachmentUrl = null;
+    if (req.file) {
+      const allowedTypes = ["application/pdf", "image/jpeg", "image/png"];
+      if (!allowedTypes.includes(req.file.mimetype)) {
+        throw createHttpError(400, "Attachment must be PDF, JPG, or PNG");
+      }
+
+      if (req.file.size > 10 * 1024 * 1024) {
+        throw createHttpError(400, "Attachment must be under 10MB");
+      }
+
+      // Upload to R2
+      const { storageService } = await import("../services/storageService.js");
+      const uploadResult = await storageService.uploadFile(req.file.buffer, {
+        filename: `${company.companyId}-${Date.now()}-${req.file.originalname}`,
+        contentType: req.file.mimetype,
+        provider: "r2",
+      });
+      attachmentUrl = uploadResult.url;
+    }
+
+    // Preserve block information if not already set
+    const blockInfo = company.blockInfo || {
+      reason: company.adminReview?.comments || "No reason provided",
+      blockedBy: company.adminReview?.reviewedBy || "system",
+      blockedAt: company.adminReview?.reviewedAt || new Date(),
+    };
+
+    // Archive current reappeal to history if exists
+    const history = company.reappeal?.history || [];
+    if (company.reappeal?.message) {
+      history.push({
+        message: company.reappeal.message,
+        attachment: company.reappeal.attachment,
+        submittedAt: company.reappeal.submittedAt,
+        reviewedAt: company.reappeal.reviewedAt,
+        decision: company.reappeal.reviewedAt ? "rejected" : null,
+        reviewedBy: company.reappeal.reviewedBy,
+        feedback: company.reappeal.reviewFeedback || company.reappeal.rejectionReason,
+      });
+
+      // Clean up old attachment from storage (non-blocking)
+      if (company.reappeal.attachment) {
+        const { storageService } = await import("../services/storageService.js");
+        const oldAttachmentKey = extractKeyFromUrl(company.reappeal.attachment);
+        if (oldAttachmentKey) {
+          storageService.deleteFile(oldAttachmentKey, "r2").catch((error) => {
+            logger.warn("Failed to delete old reappeal attachment", { 
+              key: oldAttachmentKey, 
+              error: error.message 
+            });
+          });
+        }
+      }
+    }
+
+    // Update company with reappeal data
+    const updatedCompany = await Company.findByIdAndUpdate(
+      company._id,
+      {
+        status: "reappeal",
+        blockInfo,
+        reappeal: {
+          message: trimmedMessage,
+          attachment: attachmentUrl,
+          submittedAt: new Date(),
+          reviewedBy: null,
+          reviewedAt: null,
+          reviewFeedback: null,
+          rejectionReason: null,
+          cooldownEndsAt: null,
+          history,
+        },
+      },
+      { new: true, runValidators: true }
+    );
+
+    // Send confirmation notification to company (Requirements: 6.1)
+    const Notification = (await import("../models/Notification.js")).default;
+    await Notification.create({
+      notificationId: `NTF-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      userId: updatedCompany._id,
+      role: "company",
+      type: "reappeal_submitted",
+      title: "Reappeal Submitted Successfully",
+      message: `Your reappeal request has been submitted and is now under review. We will notify you once an admin reviews your request. Submitted on: ${updatedCompany.reappeal.submittedAt.toLocaleDateString()}`,
+      priority: "medium",
+      actionUrl: "/company/blocked",
+      metadata: {
+        companyId: updatedCompany.companyId,
+        submittedAt: updatedCompany.reappeal.submittedAt,
+      },
+    });
+
+    // Notify all admins about new reappeal submission (Requirements: 6.4)
+    const Admin = (await import("../models/Admin.js")).default;
+    const admins = await Admin.find({}).lean();
+    for (const admin of admins) {
+      await Notification.create({
+        notificationId: `NTF-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        userId: admin._id,
+        role: "admin",
+        type: "new_reappeal_alert",
+        title: "New Reappeal Request",
+        message: `${updatedCompany.companyName} has submitted a reappeal request. Please review and take action.`,
+        priority: "high",
+        actionUrl: "/admin/reappeals",
+        metadata: {
+          companyId: updatedCompany.companyId,
+          companyName: updatedCompany.companyName,
+          submittedAt: updatedCompany.reappeal.submittedAt,
+        },
+      }).catch((error) => {
+        logger.warn("Failed to send admin reappeal alert", {
+          adminId: admin.adminId,
+          error: error.message,
+        });
+      });
+    }
+
+    res.json(
+      apiSuccess(
+        {
+          status: updatedCompany.status,
+          submittedAt: updatedCompany.reappeal.submittedAt,
+        },
+        "Reappeal submitted successfully"
+      )
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getReappealStatus = async (req, res, next) => {
+  try {
+    const context = await resolveUserFromRequest(req);
+    if (context.role !== "company") {
+      throw createHttpError(403, "Company access required");
+    }
+
+    const company = context.doc;
+
+    const canReappeal =
+      company.status === "blocked" &&
+      (!company.reappeal?.cooldownEndsAt || new Date() >= company.reappeal.cooldownEndsAt);
+
+    res.json(
+      apiSuccess(
+        {
+          status: company.status,
+          blockReason: company.blockInfo?.reason,
+          blockedAt: company.blockInfo?.blockedAt,
+          blockedBy: company.blockInfo?.blockedBy,
+          adminReview: company.adminReview,
+          reappealMessage: company.reappeal?.message,
+          reappealAttachment: company.reappeal?.attachment,
+          reappealSubmittedAt: company.reappeal?.submittedAt,
+          canReappeal,
+          cooldownEndsAt: company.reappeal?.cooldownEndsAt,
+        },
+        "Reappeal status retrieved"
+      )
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Mark internship completion as complete
+ * Requirements: 1.1, 1.2, 1.3, 1.4
+ */
+export const markCompletionComplete = async (req, res, next) => {
+  try {
+    const company = await ensureCompanyContext(req);
+    const { completionId } = req.params;
+    const { evaluationScore, evaluationComments } = req.body;
+
+    // Validate required fields
+    if (evaluationScore === undefined || !evaluationComments) {
+      throw createHttpError(400, "evaluationScore and evaluationComments are required");
+    }
+
+    // Validate evaluation score range
+    if (typeof evaluationScore !== 'number' || evaluationScore < 0 || evaluationScore > 10) {
+      throw createHttpError(400, "evaluationScore must be a number between 0 and 10");
+    }
+
+    // Find the completion record
+    const completion = await InternshipCompletion.findOne({
+      completionId: completionId,
+      companyId: company._id
+    });
+
+    if (!completion) {
+      throw createHttpError(404, "Internship completion not found");
+    }
+
+    // Check if already marked complete
+    if (completion.companyCompletion?.markedCompleteAt) {
+      throw createHttpError(400, "Internship completion already marked as complete");
+    }
+
+    // Validate that all required milestones are met (Requirements: 1.4)
+    // Check if logbooks are approved
+    const logbooks = await Logbook.find({
+      studentId: completion.studentId,
+      internshipId: completion.internshipId,
+      status: 'approved'
+    });
+
+    if (logbooks.length === 0) {
+      throw createHttpError(400, "Cannot mark complete: No approved logbooks found. All required milestones must be met.");
+    }
+
+    // Update completion with company completion details (Requirements: 1.1, 1.3)
+    completion.companyCompletion = {
+      markedCompleteBy: company.companyId,
+      markedCompleteAt: new Date(),
+      evaluationScore,
+      evaluationComments
+    };
+    completion.status = 'completed';
+
+    await completion.save();
+
+    // Notify student that internship is marked complete (Requirements: 1.2)
+    const Notification = (await import("../models/Notification.js")).default;
+    await Notification.create({
+      notificationId: `NTF-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      userId: completion.studentId,
+      role: "student",
+      type: "internship_completed",
+      title: "Internship Marked Complete",
+      message: `Your internship has been marked as complete by ${company.companyName}. You can now request credit transfer.`,
+      priority: "high",
+      actionUrl: `/student/internships/${completion.internshipId}`,
+      metadata: {
+        completionId: completion.completionId,
+        companyId: company.companyId,
+        companyName: company.companyName,
+        evaluationScore
+      }
+    }).catch((error) => {
+      logger.warn("Failed to send completion notification to student", {
+        studentId: completion.studentId,
+        error: error.message
+      });
+    });
+
+    res.json(apiSuccess(completion, "Internship completion marked as complete"));
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Get list of completed internships
+ * Requirements: 1.1, 1.2, 1.3, 1.4
+ */
+export const getCompletedInternships = async (req, res, next) => {
+  try {
+    const company = await ensureCompanyContext(req);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    // Find all completed internships for this company
+    const query = {
+      companyId: company._id,
+      'companyCompletion.markedCompleteAt': { $exists: true }
+    };
+
+    const [completions, total] = await Promise.all([
+      InternshipCompletion.find(query)
+        .populate('studentId', 'profile.name profile.email profile.department')
+        .populate('internshipId', 'title internshipId')
+        .sort({ 'companyCompletion.markedCompleteAt': -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      InternshipCompletion.countDocuments(query)
+    ]);
+
+    res.json(
+      apiSuccess(
+        {
+          completions,
+          pagination: {
+            page,
+            limit,
+            total,
+            pages: Math.ceil(total / limit)
+          }
+        },
+        "Completed internships retrieved"
+      )
+    );
   } catch (error) {
     next(error);
   }

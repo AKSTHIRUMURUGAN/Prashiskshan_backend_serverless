@@ -99,6 +99,19 @@ describe("Admin Routes - CRUD Operations", () => {
       expect(response.body.data.totals.companies).toBeGreaterThanOrEqual(0);
       expect(response.body.data.totals.internships).toBeGreaterThanOrEqual(0);
     });
+
+    it("should include reappeal count in dashboard statistics", async () => {
+      const response = await request(app)
+        .get("/admins/dashboard")
+        .set("Authorization", `Bearer ${authToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.counts).toBeDefined();
+      expect(response.body.data.counts.reappealCompanies).toBeDefined();
+      expect(typeof response.body.data.counts.reappealCompanies).toBe('number');
+      expect(response.body.data.counts.reappealCompanies).toBeGreaterThanOrEqual(0);
+    });
   });
 
   describe("GET /admins/companies/pending - Read Pending Companies", () => {

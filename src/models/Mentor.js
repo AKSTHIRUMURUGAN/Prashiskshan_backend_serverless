@@ -21,6 +21,7 @@ const mentorSchema = new Schema(
       bio: String,
       expertiseAreas: { type: [String], default: [] },
       avatar: String,
+      avatarFileId: String, // ImageKit fileId for deletion
     },
     assignedStudents: [{ type: Schema.Types.ObjectId, ref: "Student" }],
     workload: {

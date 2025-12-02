@@ -7,11 +7,14 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
+    "workers": "node src/workers/startWorkers.js",
+    "workers:dev": "nodemon src/workers/startWorkers.js",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand",
     "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
     "lint": "eslint .",
     "format": "prettier . --write",
-    "build:openapi": "node ./scripts/build-openapi.mjs"
+    "build:openapi": "node ./scripts/build-openapi.mjs",
+    "migrate:credit-transfer": "node ./scripts/migrate-credit-transfer-system.js"
   },
   "keywords": [
     "prashiskshan",
@@ -64,6 +67,7 @@
     "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.1",
     "eslint-plugin-prettier": "^5.2.1",
+    "fast-check": "^4.3.0",
     "jest": "^30.2.0",
     "nodemon": "^3.1.11",
     "prettier": "^3.6.2",

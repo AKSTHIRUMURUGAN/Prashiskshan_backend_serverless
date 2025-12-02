@@ -11,6 +11,7 @@ const connectionOptions = {
   maxPoolSize: 10,
   serverSelectionTimeoutMS: 5000,
   socketTimeoutMS: 45000,
+  family: 4, // Force IPv4
 };
 
 mongoose.connection.on("connected", () => {

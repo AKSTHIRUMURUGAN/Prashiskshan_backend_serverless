@@ -240,7 +240,46 @@ export const getMyApplications = async (req, res, next) => {
       .sort({ appliedAt: -1 })
       .lean();
 
-    res.json(apiSuccess({ applications }, "Student applications"));
+    // Import InternshipCompletion to check credit request availability
+    const InternshipCompletion = (await import("../models/InternshipCompletion.js")).default;
+    
+    // Get completion records for all applications
+    const applicationIds = applications.map(app => app._id);
+    const completions = await InternshipCompletion.find({
+      studentId: student._id,
+      internshipId: { $in: applications.map(app => app.internshipId?._id).filter(Boolean) }
+    }).lean();
+    
+    // Create a map of internshipId to completion data
+    const completionMap = new Map();
+    completions.forEach(completion => {
+      completionMap.set(completion.internshipId.toString(), {
+        isCompleted: completion.status === 'completed',
+        creditRequestAvailable: completion.status === 'completed' && !completion.creditRequest?.requested,
+        creditRequestStatus: completion.creditRequest?.status,
+        creditRequestId: completion.creditRequest?.requestId,
+        completionId: completion._id
+      });
+    });
+    
+    // Enhance applications with credit request availability
+    const enhancedApplications = applications.map(app => {
+      const internshipId = app.internshipId?._id?.toString();
+      const completionData = completionMap.get(internshipId) || {
+        isCompleted: false,
+        creditRequestAvailable: false,
+        creditRequestStatus: null,
+        creditRequestId: null,
+        completionId: null
+      };
+      
+      return {
+        ...app,
+        creditRequest: completionData
+      };
+    });
+
+    res.json(apiSuccess({ applications: enhancedApplications }, "Student applications"));
   } catch (error) {
     next(error);
   }
@@ -569,6 +608,58 @@ export const chatbotQuery = async (req, res, next) => {
     );
 
     res.json(apiSuccess({ response }, "Chatbot response"));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getCompletedInternshipsWithCreditStatus = async (req, res, next) => {
+  try {
+    const student = await ensureStudentContext(req);
+    const { page, limit, skip } = buildPagination(req);
+    
+    const InternshipCompletion = (await import("../models/InternshipCompletion.js")).default;
+    
+    // Find all completed internships for this student
+    const query = {
+      studentId: student._id,
+      status: 'completed'
+    };
+    
+    const [completions, total] = await Promise.all([
+      InternshipCompletion.find(query)
+        .populate('internshipId')
+        .populate('companyId')
+        .sort({ completionDate: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      InternshipCompletion.countDocuments(query)
+    ]);
+    
+    // Enhance with credit request availability
+    const enhancedCompletions = completions.map(completion => ({
+      ...completion,
+      creditRequestAvailable: !completion.creditRequest?.requested,
+      canRequestCredit: !completion.creditRequest?.requested,
+      creditRequestStatus: completion.creditRequest?.status || null,
+      creditRequestId: completion.creditRequest?.requestId || null
+    }));
+    
+    res.json(
+      apiSuccess(
+        {
+          items: enhancedCompletions,
+          pagination: {
+            page,
+            limit,
+            total,
+            pages: Math.ceil(total / limit)
+          }
+        },
+        "Completed internships with credit status"
+      )
+    );
   } catch (error) {
     next(error);
   }

@@ -121,7 +121,7 @@ export const registerStudent = async (req, res, next) => {
 
 export const registerCompany = async (req, res, next) => {
   try {
-    const { email, password, companyName, website, phone, address, documents = {}, pointOfContact = {} } = req.body;
+    const { email, password, companyName, website, phone, address, documents = {}, pointOfContact = {}, about, logoUrl } = req.body;
     if (!email || !password || !companyName || !website || !phone || !address) {
       throw createHttpError(400, "Missing required company fields");
     }
@@ -165,6 +165,8 @@ export const registerCompany = async (req, res, next) => {
         address,
         documents,
         pointOfContact,
+        about,
+        logoUrl,
       });
 
       // Create a Firebase custom token and set it as a cookie for client exchange
@@ -305,7 +307,7 @@ export const sendVerificationEmail = async (req, res, next) => {
       handleCodeInApp: true,
     };
     const link = await firebaseAdmin.auth().generateEmailVerificationLink(email, actionCodeSettings);
-    await emailService.sendEmail({ to: email, subject: "Verify your email", html: `<p>Please verify your email by clicking <a href=\"${link}\">here</a>.</p>` });
+    await emailService.sendTemplate("verify-email", { email, link });
     res.json(apiSuccess({}, "Verification email sent"));
   } catch (err) {
     next(err);
@@ -316,12 +318,21 @@ export const sendPasswordResetEmail = async (req, res, next) => {
   try {
     const { email } = req.body;
     if (!email) throw createHttpError(400, "Email is required");
+
+    const exists = await emailExists(email);
+    if (!exists) {
+      return res.json({
+        success: false,
+        error: "Email not registered. Please sign up first."
+      });
+    }
+
     const actionCodeSettings = {
       url: `${config.app.frontendUrl}/auth/reset-password`,
       handleCodeInApp: true,
     };
     const link = await firebaseAdmin.auth().generatePasswordResetLink(email, actionCodeSettings);
-    await emailService.sendEmail({ to: email, subject: "Reset your password", html: `<p>Reset password by clicking <a href=\"${link}\">here</a>.</p>` });
+    await emailService.sendEmail({ to: email, subject: "Reset your password", html: `<p>Reset password by clicking <a href="${link}">here</a>.</p>` });
     res.json(apiSuccess({}, "Password reset email sent"));
   } catch (err) {
     next(err);
@@ -348,7 +359,7 @@ export const updateProfile = async (req, res, next) => {
 
     let updatedDoc;
     if (context.role === "student") {
-      const allowedProfileFields = ["name", "department", "year", "college", "rollNumber", "phone", "bio", "skills", "interests", "resume", "profileImage"];
+      const allowedProfileFields = ["name", "department", "year", "college", "rollNumber", "phone", "bio", "skills", "interests", "resume", "profileImage", "profileImageFileId"];
       const profileUpdates = {};
       allowedProfileFields.forEach((field) => {
         if (updates.profile && updates.profile[field] !== undefined) {
@@ -371,7 +382,7 @@ export const updateProfile = async (req, res, next) => {
       });
       updatedDoc = await Company.findByIdAndUpdate(context.doc._id, { $set: set }, { new: true });
     } else if (context.role === "mentor") {
-      const allowedFields = ["profile.phone", "profile.bio", "profile.expertiseAreas"];
+      const allowedFields = ["profile.phone", "profile.bio", "profile.expertiseAreas", "profile.avatar", "profile.avatarFileId"];
       const set = {};
       allowedFields.forEach((path) => {
         const [root, sub] = path.split(".");
@@ -380,8 +391,18 @@ export const updateProfile = async (req, res, next) => {
         }
       });
       updatedDoc = await Mentor.findByIdAndUpdate(context.doc._id, { $set: set }, { new: true });
+    } else if (context.role === "admin") {
+      // Allow admins to update basic profile fields
+      const allowedFields = ["name", "profileImage", "profileImageFileId"];
+      const set = {};
+      allowedFields.forEach((field) => {
+        if (updates[field] !== undefined) {
+          set[field] = updates[field];
+        }
+      });
+      updatedDoc = await Admin.findByIdAndUpdate(context.doc._id, { $set: set }, { new: true });
     } else {
-      throw createHttpError(403, "Admins manage profiles via admin console");
+      throw createHttpError(403, "Profile updates not allowed for this role");
     }
 
     res.json(apiSuccess({ user: sanitizeDoc(updatedDoc, context.role) }, "Profile updated"));
@@ -445,26 +466,105 @@ export const exchangeCookieToken = async (req, res, next) => {
 
 export const uploadProfileImage = async (req, res, next) => {
   try {
-    if (!req.file) throw createHttpError(400, "Profile image file is required");
-    const context = await resolveUserFromRequest(req);
-    const fileName = `profile-${context.doc._id}-${Date.now()}`;
+    if (!req.file) throw createHttpError(400, "No image file provided");
 
-    const uploadResponse = await imagekitClient.upload({
-      file: req.file.buffer.toString("base64"),
-      fileName,
-      folder: "/profiles",
-      useUniqueFileName: true,
-    });
-
-    if (context.role === "student") {
-      await Student.findByIdAndUpdate(context.doc._id, { "profile.profileImage": uploadResponse.url });
-    } else if (context.role === "company") {
-      await Company.findByIdAndUpdate(context.doc._id, { logoUrl: uploadResponse.url });
-    } else if (context.role === "mentor") {
-      await Mentor.findByIdAndUpdate(context.doc._id, { "profile.avatar": uploadResponse.url });
+    // Validate file type (JPEG, PNG, WebP only)
+    const allowedMimeTypes = ["image/jpeg", "image/png", "image/webp"];
+    if (!allowedMimeTypes.includes(req.file.mimetype)) {
+      throw createHttpError(400, "Invalid file type. Only JPEG, PNG, and WebP are allowed");
     }
 
-    res.json(apiSuccess({ imageUrl: uploadResponse.url }, "Profile image updated"));
+    // Validate file size (max 5MB)
+    const maxSize = 5 * 1024 * 1024; // 5MB in bytes
+    if (req.file.size > maxSize) {
+      throw createHttpError(413, "File size exceeds 5MB limit");
+    }
+
+    const context = await resolveUserFromRequest(req);
+    
+    // Get old image URL to delete it later
+    let oldImageUrl = null;
+    if (context.role === "student") {
+      oldImageUrl = context.doc.profile?.profileImage;
+    } else if (context.role === "admin") {
+      oldImageUrl = context.doc.profileImage;
+    } else if (context.role === "mentor") {
+      oldImageUrl = context.doc.profile?.avatar;
+    } else if (context.role === "company") {
+      oldImageUrl = context.doc.logoUrl;
+    }
+
+    const fileName = `profile-${context.doc._id}-${Date.now()}.${req.file.mimetype.split("/")[1]}`;
+
+    // Upload to storage service
+    const uploadResult = await storageService.uploadFile(req.file.buffer, {
+      filename: fileName,
+      contentType: req.file.mimetype,
+      provider: config.storage?.defaultProvider || "s3",
+    });
+
+    // Update appropriate model based on role
+    if (context.role === "student") {
+      const updateData = { "profile.profileImage": uploadResult.url };
+      if (uploadResult.fileId) {
+        updateData["profile.profileImageFileId"] = uploadResult.fileId;
+      }
+      await Student.findByIdAndUpdate(context.doc._id, updateData);
+    } else if (context.role === "admin") {
+      const updateData = { profileImage: uploadResult.url };
+      if (uploadResult.fileId) {
+        updateData.profileImageFileId = uploadResult.fileId;
+      }
+      await Admin.findByIdAndUpdate(context.doc._id, updateData);
+    } else if (context.role === "mentor") {
+      const updateData = { "profile.avatar": uploadResult.url };
+      if (uploadResult.fileId) {
+        updateData["profile.avatarFileId"] = uploadResult.fileId;
+      }
+      await Mentor.findByIdAndUpdate(context.doc._id, updateData);
+    } else if (context.role === "company") {
+      await Company.findByIdAndUpdate(context.doc._id, { logoUrl: uploadResult.url });
+    }
+
+    // Delete old image if it exists
+    if (oldImageUrl) {
+      try {
+        // Extract the key from the URL for deletion
+        // The key is typically the path after the domain
+        const urlParts = new URL(oldImageUrl);
+        const key = urlParts.pathname.substring(1); // Remove leading slash
+        
+        await storageService.deleteFile(key, uploadResult.provider);
+        logger.info("Old profile image deleted", { 
+          userId: context.doc._id, 
+          oldImageUrl 
+        });
+      } catch (deleteError) {
+        // Log error but don't fail the upload if deletion fails
+        logger.error("Failed to delete old profile image", { 
+          userId: context.doc._id, 
+          oldImageUrl,
+          error: deleteError.message 
+        });
+      }
+    }
+
+    logger.info("Profile image uploaded", { 
+      userId: context.doc._id, 
+      role: context.role, 
+      imageUrl: uploadResult.url,
+      fileId: uploadResult.fileId 
+    });
+
+    const responseData = { 
+      url: uploadResult.url,
+      imageUrl: uploadResult.url // Keep for backward compatibility
+    };
+    if (uploadResult.fileId) {
+      responseData.fileId = uploadResult.fileId;
+    }
+
+    res.json(apiSuccess(responseData, "Profile image uploaded successfully"));
   } catch (error) {
     next(error);
   }

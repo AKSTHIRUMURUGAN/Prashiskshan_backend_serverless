@@ -21,6 +21,26 @@ const certificateSchema = new Schema(
   { _id: false },
 );
 
+const creditRequestSchema = new Schema(
+  {
+    requested: { type: Boolean, default: false },
+    requestId: { type: Schema.Types.ObjectId, ref: "CreditRequest" },
+    requestedAt: Date,
+    status: String,
+  },
+  { _id: false },
+);
+
+const companyCompletionSchema = new Schema(
+  {
+    markedCompleteBy: String,
+    markedCompleteAt: Date,
+    evaluationScore: Number,
+    evaluationComments: String,
+  },
+  { _id: false },
+);
+
 const completionSchema = new Schema(
   {
     completionId: { type: String, required: true, unique: true, index: true },
@@ -33,7 +53,13 @@ const completionSchema = new Schema(
     evaluation: evaluationSchema,
     certificates: certificateSchema,
     aiSummary: String,
-    status: { type: String, enum: ["pending", "issued"], default: "pending" },
+    status: { type: String, enum: ["pending", "issued", "completed"], default: "pending" },
+    
+    // Credit request tracking
+    creditRequest: { type: creditRequestSchema, default: () => ({}) },
+    
+    // Company completion details
+    companyCompletion: companyCompletionSchema,
   },
   { timestamps: true },
 );

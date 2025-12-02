@@ -191,6 +191,34 @@ export const emailService = {
             </div>
           `,
         });
+      case "verify-email":
+        return this.sendEmail({
+          to: data.email,
+          subject: "Verify your email address",
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9fafb; border-radius: 10px;">
+              <div style="text-align: center; margin-bottom: 30px;">
+                <h1 style="color: #2563eb; margin: 0; font-size: 24px;">Prashiskshan</h1>
+              </div>
+              <div style="background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <div style="text-align: center; margin-bottom: 20px;">
+                  <span style="font-size: 48px;">✉️</span>
+                </div>
+                <h2 style="text-align: center; color: #1f2937; margin-top: 0;">Verify your email address</h2>
+                <p style="color: #4b5563; font-size: 16px; line-height: 1.5;">Hi there,</p>
+                <p style="color: #4b5563; font-size: 16px; line-height: 1.5;">Thanks for signing up for Prashiskshan! Please verify your email address to get started.</p>
+                <div style="text-align: center; margin: 30px 0;">
+                  <a href="${data.link}" style="background-color: #2563eb; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold; display: inline-block;">Verify Email</a>
+                </div>
+                <p style="color: #6b7280; font-size: 14px; text-align: center;">Or copy and paste this link into your browser:</p>
+                <p style="color: #6b7280; font-size: 12px; text-align: center; word-break: break-all;">${data.link}</p>
+              </div>
+              <div style="text-align: center; margin-top: 20px; color: #9ca3af; font-size: 12px;">
+                &copy; ${new Date().getFullYear()} Prashiskshan. All rights reserved.
+              </div>
+            </div>
+          `,
+        });
       default:
         return this.sendEmail(data);
     }

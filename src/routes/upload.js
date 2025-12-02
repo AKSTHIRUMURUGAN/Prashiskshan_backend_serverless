@@ -11,8 +11,23 @@ const router = Router();
 const upload = multer({
     storage: multer.memoryStorage(),
     limits: {
-        fileSize: 5 * 1024 * 1024, // 5MB limit
+        fileSize: 10 * 1024 * 1024, // 10MB limit for documents
     },
+    fileFilter: (req, file, cb) => {
+        // Allow PDF and image files for document uploads
+        const allowedMimeTypes = [
+            'application/pdf',
+            'image/jpeg',
+            'image/jpg',
+            'image/png'
+        ];
+        
+        if (allowedMimeTypes.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('Invalid file type. Only PDF, JPG, JPEG, and PNG files are allowed.'), false);
+        }
+    }
 });
 
 /**
@@ -39,17 +54,19 @@ const upload = multer({
  */
 router.post(
     "/",
-    authenticate,
+    // authenticate, // Allow unauthenticated uploads for registration
     upload.single("file"),
     asyncHandler(async (req, res) => {
         if (!req.file) {
             throw createHttpError(400, "No file uploaded");
         }
 
+        const provider = req.query.provider || "r2"; // Default to r2 if not specified
+
         const result = await storageService.uploadFile(req.file.buffer, {
             filename: req.file.originalname,
             contentType: req.file.mimetype,
-            provider: "r2", // Use R2 as requested
+            provider: provider,
         });
 
         res.json(apiSuccess(result, "File uploaded successfully"));
@@ -79,28 +96,24 @@ router.post(
  */
 router.delete(
     "/",
-    authenticate,
+    // authenticate, // Allow unauthenticated delete for registration cleanup
     asyncHandler(async (req, res) => {
-        const { url } = req.body;
+        const { url, fileId, provider = "r2" } = req.body;
+
+        if (provider === "imagekit") {
+            if (!fileId) throw createHttpError(400, "File ID is required for ImageKit deletion");
+            await storageService.deleteFile(fileId, "imagekit");
+            return res.json(apiSuccess(null, "File deleted successfully"));
+        }
+
         if (!url) throw createHttpError(400, "URL is required");
 
         // Extract key from URL
         // Assuming URL format: .../key
-        const key = url.split("/").slice(3).join("/"); // Adjust based on URL structure
-        // For R2 public URL, it might be just the last part or path after domain
-        // Let's try to extract from the end
-        // R2 URL: https://<custom-domain>/<key> or https://<account>.r2.cloudflarestorage.com/<bucket>/<key>
-        // Our storage service constructs it as: config.r2.publicUrl/key
-
-        // Simple extraction: everything after the last slash is filename, but key includes date folder
-        // Better: remove the publicUrl part
-        // But we don't have easy access to config here without importing it.
-        // Let's assume the key is the path part of the URL.
-
         const urlObj = new URL(url);
         const keyFromUrl = urlObj.pathname.substring(1); // Remove leading slash
 
-        await storageService.deleteFile(keyFromUrl, "r2");
+        await storageService.deleteFile(keyFromUrl, provider);
 
         res.json(apiSuccess(null, "File deleted successfully"));
     })

@@ -83,5 +83,20 @@ export const aiFeatureLimit = (feature) => async (req, res, next) => {
   }
 };
 
-export { generalRateLimiter, authRateLimiter, uploadRateLimiter };
+// Rate limiter specifically for reappeal submissions
+// Stricter limits to prevent abuse
+const reappealRateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') ? 1000 : 3, // 3 submissions per hour in production
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: createRedisStore(),
+  message: { 
+    success: false, 
+    error: "TooManyReappealAttempts",
+    message: "Too many reappeal submission attempts. Please try again later." 
+  },
+});
+
+export { generalRateLimiter, authRateLimiter, uploadRateLimiter, reappealRateLimiter };
 

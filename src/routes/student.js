@@ -18,10 +18,31 @@ import {
   getCreditsSummary,
   generateNEPReport,
   chatbotQuery,
+  getCompletedInternshipsWithCreditStatus,
 } from "../controllers/studentController.js";
+import {
+  createCreditRequest,
+  getStudentCreditRequests,
+  getCreditRequestDetails,
+  resubmitCreditRequest,
+  getCreditRequestStatus,
+  sendReviewReminder,
+  getCreditHistory,
+  downloadCertificate,
+} from "../controllers/creditRequestController.js";
 import { authenticate, identifyUser, authorize } from "../middleware/auth.js";
 import { aiFeatureLimit } from "../middleware/rateLimiter.js";
-import { applicationSubmit, logbookSubmission, handleValidationErrors } from "../middleware/validation.js";
+import { 
+  applicationSubmit, 
+  logbookSubmission, 
+  creditRequestCreation,
+  creditRequestResubmission,
+  handleValidationErrors,
+  validateObjectIdParam,
+  validatePagination,
+  validateStatusFilter,
+  validateDateRange,
+} from "../middleware/validation.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
 const router = Router();
@@ -237,5 +258,149 @@ router.post("/reports/nep", studentAuth, asyncHandler(generateNEPReport));
  *       - bearerAuth: []
  */
 router.post("/chatbot", studentAuth, aiFeatureLimit("chatbot"), asyncHandler(chatbotQuery));
+
+/**
+ * @swagger
+ * /api/students/internships/completed:
+ *   get:
+ *     summary: Get completed internships with credit request availability
+ *     tags: [Students]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get("/internships/completed", studentAuth, asyncHandler(getCompletedInternshipsWithCreditStatus));
+
+/**
+ * @swagger
+ * /api/students/:studentId/credit-requests:
+ *   post:
+ *     summary: Create a new credit request
+ *     tags: [Students, Credit Requests]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.post(
+  "/:studentId/credit-requests",
+  studentAuth,
+  validateObjectIdParam("studentId"),
+  creditRequestCreation,
+  handleValidationErrors,
+  asyncHandler(createCreditRequest)
+);
+
+/**
+ * @swagger
+ * /api/students/:studentId/credit-requests:
+ *   get:
+ *     summary: Get all credit requests for a student
+ *     tags: [Students, Credit Requests]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get(
+  "/:studentId/credit-requests",
+  studentAuth,
+  validateObjectIdParam("studentId"),
+  validatePagination,
+  validateStatusFilter,
+  validateDateRange,
+  asyncHandler(getStudentCreditRequests)
+);
+
+/**
+ * @swagger
+ * /api/students/:studentId/credit-requests/:requestId:
+ *   get:
+ *     summary: Get credit request details
+ *     tags: [Students, Credit Requests]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get(
+  "/:studentId/credit-requests/:requestId",
+  studentAuth,
+  validateObjectIdParam("studentId"),
+  validateObjectIdParam("requestId"),
+  asyncHandler(getCreditRequestDetails)
+);
+
+/**
+ * @swagger
+ * /api/students/:studentId/credit-requests/:requestId/resubmit:
+ *   put:
+ *     summary: Resubmit a rejected credit request
+ *     tags: [Students, Credit Requests]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.put(
+  "/:studentId/credit-requests/:requestId/resubmit",
+  studentAuth,
+  validateObjectIdParam("studentId"),
+  validateObjectIdParam("requestId"),
+  creditRequestResubmission,
+  handleValidationErrors,
+  asyncHandler(resubmitCreditRequest)
+);
+
+/**
+ * @swagger
+ * /api/students/:studentId/credit-requests/:requestId/status:
+ *   get:
+ *     summary: Get real-time status of a credit request
+ *     tags: [Students, Credit Requests]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get(
+  "/:studentId/credit-requests/:requestId/status",
+  studentAuth,
+  asyncHandler(getCreditRequestStatus)
+);
+
+/**
+ * @swagger
+ * /api/students/:studentId/credit-requests/:requestId/reminder:
+ *   post:
+ *     summary: Send a reminder to the current reviewer
+ *     tags: [Students, Credit Requests]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.post(
+  "/:studentId/credit-requests/:requestId/reminder",
+  studentAuth,
+  asyncHandler(sendReviewReminder)
+);
+
+/**
+ * @swagger
+ * /api/students/:studentId/credits/history:
+ *   get:
+ *     summary: Get credit history for a student
+ *     tags: [Students, Credit Requests]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get(
+  "/:studentId/credits/history",
+  studentAuth,
+  asyncHandler(getCreditHistory)
+);
+
+/**
+ * @swagger
+ * /api/students/:studentId/credits/certificate/:requestId:
+ *   get:
+ *     summary: Download credit transfer certificate
+ *     tags: [Students, Credit Requests]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get(
+  "/:studentId/credits/certificate/:requestId",
+  studentAuth,
+  asyncHandler(downloadCertificate)
+);
 
 export default router;

@@ -17,6 +17,15 @@ const QUEUE_DEFINITIONS = {
   notification: { name: "notifications" },
   completion: { name: "completion-processing" },
   ai: { name: "ai-processing" },
+  creditNotification: { 
+    name: "credit-notifications",
+    defaultJobOptions: {
+      attempts: 3,
+      backoff: { type: "exponential", delay: 2000 },
+      removeOnComplete: 100,
+      removeOnFail: 500,
+    },
+  },
 };
 
 const queues = {};

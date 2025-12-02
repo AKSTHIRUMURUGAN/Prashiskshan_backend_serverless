@@ -7,7 +7,7 @@ import config from "./config/index.js";
 import { connectDB } from "./config/database.js";
 import apiRouter from "./routes/index.js";
 import { requestLogger } from "./middleware/logger.js";
-import { errorHandler } from "./middleware/errorHandler.js";
+import { errorHandler, attachRequestId } from "./middleware/errorHandler.js";
 import { generalRateLimiter } from "./middleware/rateLimiter.js";
 import { logger } from "./utils/logger.js";
 import { registerBullBoard } from "./queues/index.js";
@@ -27,6 +27,7 @@ app.use(cors(corsOptions));
 app.use(compression());
 app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true }));
+app.use(attachRequestId);
 app.use(requestLogger);
 
 app.get("/", (_req, res) => {
