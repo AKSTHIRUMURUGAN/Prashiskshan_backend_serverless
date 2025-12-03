@@ -10,7 +10,12 @@ import notificationWorker from "./notificationWorker.js";
 import creditNotificationWorker from "./creditNotificationWorker.js";
 import creditReminderWorker from "./creditReminderWorker.js";
 import { createMetricsWorker } from "./metricsWorker.js";
+import aiTaggingWorker from "./aiTaggingWorker.js";
+import deadlineReminderWorker from "./deadlineReminderWorker.js";
+import expiredInternshipWorker from "./expiredInternshipWorker.js";
+import analyticsSnapshotWorker from "./analyticsSnapshotWorker.js";
 import { initializeMetricsSchedules } from "../services/metricsScheduler.js";
+import { initializeInternshipWorkflowSchedules } from "../services/internshipWorkflowScheduler.js";
 
 const metricsWorker = createMetricsWorker();
 
@@ -19,6 +24,10 @@ const workers = [
   { name: "Credit Notification Worker", worker: creditNotificationWorker },
   { name: "Credit Reminder Worker", worker: creditReminderWorker },
   { name: "Metrics Worker", worker: metricsWorker },
+  { name: "AI Tagging Worker", worker: aiTaggingWorker },
+  { name: "Deadline Reminder Worker", worker: deadlineReminderWorker },
+  { name: "Expired Internship Worker", worker: expiredInternshipWorker },
+  { name: "Analytics Snapshot Worker", worker: analyticsSnapshotWorker },
 ];
 
 /**
@@ -41,6 +50,10 @@ const startWorkers = async () => {
     // Initialize metrics schedules
     await initializeMetricsSchedules();
     logger.info("Metrics schedules initialized");
+
+    // Initialize internship workflow schedules
+    await initializeInternshipWorkflowSchedules();
+    logger.info("Internship workflow schedules initialized");
 
     logger.info("All workers started successfully");
   } catch (error) {

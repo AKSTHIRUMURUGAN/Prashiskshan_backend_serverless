@@ -580,13 +580,14 @@ export const uploadResume = async (req, res, next) => {
     const uploadResult = await storageService.uploadFile(req.file.buffer, {
       filename: `resume-${context.doc.studentId}.pdf`,
       contentType: req.file.mimetype,
-      provider: "s3",
+      provider: "r2", // Use R2 storage
     });
 
     const student = await Student.findByIdAndUpdate(
       context.doc._id,
       {
-        "profile.resume": uploadResult.url,
+        "profile.resume": uploadResult.url, // Keep for backward compatibility
+        "profile.resumeUrl": uploadResult.url, // New field
       },
       { new: true },
     );

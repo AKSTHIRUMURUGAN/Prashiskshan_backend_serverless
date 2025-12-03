@@ -643,7 +643,7 @@ paths:
                 file:
                   type: string
                   format: binary
-                  description: Image file (max 5MB, formats: jpg, png, webp)
+                  description: "Image file (max 5MB, formats: jpg, png, webp)"
       responses:
         '200':
           description: Image uploaded successfully

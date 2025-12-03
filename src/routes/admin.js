@@ -33,8 +33,29 @@ import {
   sendOverdueReminders,
   scheduleReminderJob,
   getOverdueCreditRequests,
+  // Internship Verification Workflow endpoints (Task 10.1, 10.2)
+  getPendingInternshipVerifications,
+  approveInternshipVerification,
+  rejectInternshipVerification,
+  getInternshipDetailsForAdmin,
+  getSystemAnalytics,
+  getCompanyPerformanceMetrics,
+  getDepartmentPerformanceMetrics,
+  getMentorPerformanceMetrics,
+  getStudentPerformanceMetrics,
 } from "../controllers/adminController.js";
+import {
+  getInternshipsList,
+  getInternshipDetail,
+  approveInternshipPosting,
+  rejectInternshipPosting,
+  bulkApproveInternships,
+  bulkRejectInternships,
+  getInternshipAnalytics,
+  editInternshipDetails,
+} from "../controllers/adminInternshipController.js";
 import { authenticate, identifyUser, authorize } from "../middleware/auth.js";
+import { requireAdminRole } from "../middleware/adminAuth.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { 
   reappealApproval, 
@@ -47,10 +68,23 @@ import {
   validateStatusFilter,
   validateDateRange,
   validateSort,
+  sanitizeSearchQuery,
+  validateBulkOperationSize,
+  validateInternshipApproval,
+  validateInternshipRejection,
+  validateBulkRejection,
+  validateInternshipEdit,
+  validateInternshipStatusFilter,
+  validateWorkModeFilter,
 } from "../middleware/validation.js";
+import { 
+  adminBulkOperationRateLimiter,
+  adminAnalyticsRateLimiter,
+} from "../middleware/rateLimiter.js";
 
 const router = Router();
-const adminAuth = [authenticate, identifyUser, authorize("admin")];
+// Enhanced admin authentication with audit logging
+const adminAuth = [authenticate, identifyUser, authorize("admin"), requireAdminRole];
 
 /**
  * @swagger
@@ -389,7 +423,7 @@ router.get("/ai/usage", adminAuth, asyncHandler(getAIUsageStats));
  * @swagger
  * /api/admins/internships/{internshipId}/approve:
  *   post:
- *     summary: Approve internship
+ *     summary: Approve internship (legacy endpoint)
  *     tags: [Admin]
  *     security:
  *       - bearerAuth: []
@@ -400,7 +434,7 @@ router.post("/internships/:internshipId/approve", adminAuth, asyncHandler(approv
  * @swagger
  * /api/admins/internships/{internshipId}/reject:
  *   post:
- *     summary: Reject internship
+ *     summary: Reject internship (legacy endpoint)
  *     tags: [Admin]
  *     security:
  *       - bearerAuth: []
@@ -417,6 +451,367 @@ router.post("/internships/:internshipId/reject", adminAuth, asyncHandler(rejectI
  *       - bearerAuth: []
  */
 router.get("/internships", adminAuth, asyncHandler(getInternships));
+
+// ============================================================================
+// Internship Verification Workflow Routes (Task 10.1, 10.2)
+// Requirements: 2.2, 2.3, 10.1, 10.2, 10.3, 10.4, 10.5
+// ============================================================================
+
+// ============================================================================
+// Admin Internship Management Routes (Task 2.1)
+// Requirements: 1.1, 1.2, 1.3, 1.4, 2.1, 3.1, 4.1, 7.1, 8.1
+// NOTE: These specific routes MUST come before parameterized routes like /internships/:id
+// ============================================================================
+
+/**
+ * @swagger
+ * /api/admins/internships/list:
+ *   get:
+ *     summary: List internships with filtering and pagination
+ *     tags: [Admin - Internship Management]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get(
+  "/internships/list",
+  adminAuth,
+  validatePagination,
+  sanitizeSearchQuery,
+  validateInternshipStatusFilter,
+  validateWorkModeFilter,
+  validateDateRange,
+  asyncHandler(getInternshipsList)
+);
+
+/**
+ * @swagger
+ * /api/admins/internships/bulk-approve:
+ *   post:
+ *     summary: Bulk approve internships
+ *     tags: [Admin - Internship Management]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.post(
+  "/internships/bulk-approve",
+  adminAuth,
+  adminBulkOperationRateLimiter,
+  validateBulkOperationSize,
+  asyncHandler(bulkApproveInternships)
+);
+
+/**
+ * @swagger
+ * /api/admins/internships/bulk-reject:
+ *   post:
+ *     summary: Bulk reject internships
+ *     tags: [Admin - Internship Management]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.post(
+  "/internships/bulk-reject",
+  adminAuth,
+  adminBulkOperationRateLimiter,
+  validateBulkOperationSize,
+  validateBulkRejection,
+  handleValidationErrors,
+  asyncHandler(bulkRejectInternships)
+);
+
+/**
+ * @swagger
+ * /api/admins/internships/analytics:
+ *   get:
+ *     summary: Get internship analytics
+ *     tags: [Admin - Internship Management]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get(
+  "/internships/analytics",
+  adminAuth,
+  adminAnalyticsRateLimiter,
+  validateDateRange,
+  asyncHandler(getInternshipAnalytics)
+);
+
+/**
+ * @swagger
+ * /api/admins/internships/pending:
+ *   get:
+ *     summary: List pending internship verifications
+ *     tags: [Admin - Internship Verification]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         description: Items per page
+ *       - in: query
+ *         name: department
+ *         schema:
+ *           type: string
+ *         description: Filter by department
+ *       - in: query
+ *         name: companyId
+ *         schema:
+ *           type: string
+ *         description: Filter by company ID
+ */
+router.get(
+  "/internships/pending",
+  adminAuth,
+  validatePagination,
+  asyncHandler(getPendingInternshipVerifications)
+);
+
+/**
+ * @swagger
+ * /api/admins/internships/{id}/approve:
+ *   post:
+ *     summary: Approve internship posting
+ *     tags: [Admin - Internship Verification]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Internship ID
+ */
+router.post(
+  "/internships/:id/approve",
+  adminAuth,
+  asyncHandler(approveInternshipVerification)
+);
+
+/**
+ * @swagger
+ * /api/admins/internships/{id}/reject:
+ *   post:
+ *     summary: Reject internship posting with reasons
+ *     tags: [Admin - Internship Verification]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Internship ID
+ */
+router.post(
+  "/internships/:id/reject",
+  adminAuth,
+  asyncHandler(rejectInternshipVerification)
+);
+
+/**
+ * @swagger
+ * /api/admins/internships/{id}:
+ *   get:
+ *     summary: Get internship details with company history
+ *     tags: [Admin - Internship Verification]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Internship ID
+ */
+router.get(
+  "/internships/:id",
+  adminAuth,
+  asyncHandler(getInternshipDetailsForAdmin)
+);
+
+/**
+ * @swagger
+ * /api/admins/analytics:
+ *   get:
+ *     summary: Get system-wide analytics
+ *     tags: [Admin - Analytics]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: dateFrom
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Start date for analytics
+ *       - in: query
+ *         name: dateTo
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: End date for analytics
+ */
+router.get(
+  "/analytics",
+  adminAuth,
+  validateDateRange,
+  asyncHandler(getSystemAnalytics)
+);
+
+/**
+ * @swagger
+ * /api/admins/analytics/companies:
+ *   get:
+ *     summary: Get company performance metrics
+ *     tags: [Admin - Analytics]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: dateFrom
+ *         schema:
+ *           type: string
+ *           format: date
+ *       - in: query
+ *         name: dateTo
+ *         schema:
+ *           type: string
+ *           format: date
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: sortBy
+ *         schema:
+ *           type: string
+ *           enum: [averageRating, internshipsPosted, applicationsReceived, completionRate]
+ */
+router.get(
+  "/analytics/companies",
+  adminAuth,
+  validateDateRange,
+  asyncHandler(getCompanyPerformanceMetrics)
+);
+
+/**
+ * @swagger
+ * /api/admins/analytics/departments:
+ *   get:
+ *     summary: Get department performance metrics
+ *     tags: [Admin - Analytics]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: dateFrom
+ *         schema:
+ *           type: string
+ *           format: date
+ *       - in: query
+ *         name: dateTo
+ *         schema:
+ *           type: string
+ *           format: date
+ *       - in: query
+ *         name: department
+ *         schema:
+ *           type: string
+ *         description: Specific department to analyze
+ */
+router.get(
+  "/analytics/departments",
+  adminAuth,
+  validateDateRange,
+  asyncHandler(getDepartmentPerformanceMetrics)
+);
+
+/**
+ * @swagger
+ * /api/admins/analytics/mentors:
+ *   get:
+ *     summary: Get mentor performance metrics
+ *     tags: [Admin - Analytics]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: dateFrom
+ *         schema:
+ *           type: string
+ *           format: date
+ *       - in: query
+ *         name: dateTo
+ *         schema:
+ *           type: string
+ *           format: date
+ *       - in: query
+ *         name: department
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: sortBy
+ *         schema:
+ *           type: string
+ *           enum: [approvalRate, approvalsProcessed, averageResponseTime, studentsSupervised]
+ */
+router.get(
+  "/analytics/mentors",
+  adminAuth,
+  validateDateRange,
+  asyncHandler(getMentorPerformanceMetrics)
+);
+
+/**
+ * @swagger
+ * /api/admins/analytics/students:
+ *   get:
+ *     summary: Get student performance metrics
+ *     tags: [Admin - Analytics]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: department
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: minReadinessScore
+ *         schema:
+ *           type: number
+ *       - in: query
+ *         name: minCredits
+ *         schema:
+ *           type: number
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ */
+router.get(
+  "/analytics/students",
+  adminAuth,
+  validatePagination,
+  asyncHandler(getStudentPerformanceMetrics)
+);
 
 /**
  * @swagger
@@ -461,6 +856,95 @@ router.post(
   reappealRejection, 
   handleValidationErrors, 
   asyncHandler(rejectReappeal)
+);
+
+// ============================================================================
+// Admin Internship Management Routes - Parameterized Routes
+// Requirements: 2.1, 3.1, 4.1, 7.1
+// NOTE: These parameterized routes come AFTER specific routes
+// ============================================================================
+
+/**
+ * @swagger
+ * /api/admins/internships/:id/details:
+ *   get:
+ *     summary: Get detailed internship information
+ *     tags: [Admin - Internship Management]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get(
+  "/internships/:id/details",
+  adminAuth,
+  asyncHandler(getInternshipDetail)
+);
+
+/**
+ * @swagger
+ * /api/admins/internships/:id/approve-posting:
+ *   post:
+ *     summary: Approve an internship posting
+ *     tags: [Admin - Internship Management]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.post(
+  "/internships/:id/approve-posting",
+  adminAuth,
+  validateInternshipApproval,
+  handleValidationErrors,
+  asyncHandler(approveInternshipPosting)
+);
+
+/**
+ * @swagger
+ * /api/admins/internships/:id/reject-posting:
+ *   post:
+ *     summary: Reject an internship posting
+ *     tags: [Admin - Internship Management]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.post(
+  "/internships/:id/reject-posting",
+  adminAuth,
+  validateInternshipRejection,
+  handleValidationErrors,
+  asyncHandler(rejectInternshipPosting)
+);
+
+/**
+ * @swagger
+ * /api/admins/internships/:id/edit:
+ *   patch:
+ *     summary: Edit internship details (legacy route)
+ *     tags: [Admin - Internship Management]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.patch(
+  "/internships/:id/edit",
+  adminAuth,
+  validateInternshipEdit,
+  handleValidationErrors,
+  asyncHandler(editInternshipDetails)
+);
+
+/**
+ * @swagger
+ * /api/admins/internships/:id:
+ *   patch:
+ *     summary: Update internship details
+ *     tags: [Admin - Internship Management]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.patch(
+  "/internships/:id",
+  adminAuth,
+  validateInternshipEdit,
+  handleValidationErrors,
+  asyncHandler(editInternshipDetails)
 );
 
 export default router;

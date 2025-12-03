@@ -586,6 +586,288 @@ export const validateSort = (allowedFields = []) => {
 };
 
 /**
+ * Sanitize search query to prevent injection attacks
+ * Removes special regex characters and limits length
+ */
+export const sanitizeSearchQuery = (req, res, next) => {
+  if (req.query.search) {
+    // Remove special regex characters that could be used for injection
+    let search = req.query.search.toString();
+    
+    // Limit search query length
+    if (search.length > 200) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Search query must be less than 200 characters",
+          field: "search",
+          timestamp: new Date().toISOString(),
+          requestId: req.requestId,
+        },
+      });
+    }
+    
+    // Escape special regex characters
+    search = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    
+    // Trim whitespace
+    search = search.trim();
+    
+    // Update the query with sanitized value
+    req.query.search = search;
+  }
+  
+  next();
+};
+
+/**
+ * Validate bulk operation size
+ * Limits the number of items that can be processed in a single bulk operation
+ */
+export const validateBulkOperationSize = (req, res, next) => {
+  const { internshipIds } = req.body;
+  
+  if (!Array.isArray(internshipIds)) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "internshipIds must be an array",
+        field: "internshipIds",
+        timestamp: new Date().toISOString(),
+        requestId: req.requestId,
+      },
+    });
+  }
+  
+  if (internshipIds.length === 0) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "internshipIds array cannot be empty",
+        field: "internshipIds",
+        timestamp: new Date().toISOString(),
+        requestId: req.requestId,
+      },
+    });
+  }
+  
+  if (internshipIds.length > 100) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Maximum 100 internships can be processed at once",
+        field: "internshipIds",
+        timestamp: new Date().toISOString(),
+        requestId: req.requestId,
+      },
+    });
+  }
+  
+  // Validate each ID is a string
+  const invalidIds = internshipIds.filter(id => typeof id !== 'string' || !id.trim());
+  if (invalidIds.length > 0) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "All internship IDs must be non-empty strings",
+        field: "internshipIds",
+        timestamp: new Date().toISOString(),
+        requestId: req.requestId,
+      },
+    });
+  }
+  
+  next();
+};
+
+/**
+ * Validate internship approval request
+ */
+export const validateInternshipApproval = [
+  body("comments")
+    .optional()
+    .trim()
+    .isLength({ max: 1000 })
+    .withMessage("Comments must be less than 1000 characters"),
+];
+
+/**
+ * Validate internship rejection request
+ */
+export const validateInternshipRejection = [
+  body("reason")
+    .trim()
+    .notEmpty()
+    .withMessage("Rejection reason is required")
+    .isLength({ min: 10, max: 2000 })
+    .withMessage("Rejection reason must be between 10 and 2000 characters")
+    .matches(/\S/)
+    .withMessage("Rejection reason cannot be only whitespace"),
+  body("reasons")
+    .optional()
+    .isArray({ max: 10 })
+    .withMessage("Reasons must be an array with maximum 10 items"),
+  body("reasons.*")
+    .optional()
+    .trim()
+    .isLength({ min: 1, max: 200 })
+    .withMessage("Each reason must be between 1 and 200 characters"),
+];
+
+/**
+ * Validate bulk rejection request
+ */
+export const validateBulkRejection = [
+  body("reason")
+    .trim()
+    .notEmpty()
+    .withMessage("Rejection reason is required for bulk rejection")
+    .isLength({ min: 10, max: 2000 })
+    .withMessage("Rejection reason must be between 10 and 2000 characters")
+    .matches(/\S/)
+    .withMessage("Rejection reason cannot be only whitespace"),
+];
+
+/**
+ * Validate internship edit request
+ */
+export const validateInternshipEdit = [
+  body("title")
+    .optional()
+    .trim()
+    .isLength({ min: 5, max: 200 })
+    .withMessage("Title must be between 5 and 200 characters"),
+  body("description")
+    .optional()
+    .trim()
+    .isLength({ min: 50, max: 5000 })
+    .withMessage("Description must be between 50 and 5000 characters"),
+  body("requiredSkills")
+    .optional()
+    .isArray({ min: 1, max: 20 })
+    .withMessage("Required skills must be an array with 1-20 items"),
+  body("requiredSkills.*")
+    .optional()
+    .trim()
+    .isLength({ min: 1, max: 100 })
+    .withMessage("Each skill must be between 1 and 100 characters"),
+  body("optionalSkills")
+    .optional()
+    .isArray({ max: 20 })
+    .withMessage("Optional skills must be an array with maximum 20 items"),
+  body("optionalSkills.*")
+    .optional()
+    .trim()
+    .isLength({ min: 1, max: 100 })
+    .withMessage("Each skill must be between 1 and 100 characters"),
+  body("location")
+    .optional()
+    .trim()
+    .isLength({ min: 2, max: 200 })
+    .withMessage("Location must be between 2 and 200 characters"),
+  body("duration")
+    .optional()
+    .trim()
+    .isLength({ min: 1, max: 100 })
+    .withMessage("Duration must be between 1 and 100 characters"),
+  body("stipend")
+    .optional()
+    .isFloat({ min: 0, max: 1000000 })
+    .withMessage("Stipend must be between 0 and 1,000,000"),
+  body("workMode")
+    .optional()
+    .isIn(["remote", "onsite", "hybrid"])
+    .withMessage("Work mode must be remote, onsite, or hybrid"),
+  body("responsibilities")
+    .optional()
+    .isArray({ max: 20 })
+    .withMessage("Responsibilities must be an array with maximum 20 items"),
+  body("responsibilities.*")
+    .optional()
+    .trim()
+    .isLength({ min: 1, max: 500 })
+    .withMessage("Each responsibility must be between 1 and 500 characters"),
+  body("learningOpportunities")
+    .optional()
+    .isArray({ max: 20 })
+    .withMessage("Learning opportunities must be an array with maximum 20 items"),
+  body("learningOpportunities.*")
+    .optional()
+    .trim()
+    .isLength({ min: 1, max: 500 })
+    .withMessage("Each learning opportunity must be between 1 and 500 characters"),
+  body("editReason")
+    .optional()
+    .trim()
+    .isLength({ max: 500 })
+    .withMessage("Edit reason must be less than 500 characters"),
+];
+
+/**
+ * Validate internship status filter
+ */
+export const validateInternshipStatusFilter = (req, res, next) => {
+  const { status } = req.query;
+
+  if (status !== undefined && status !== "all") {
+    const validStatuses = [
+      "pending_admin_verification",
+      "admin_approved",
+      "admin_rejected",
+      "open_for_applications",
+      "closed",
+      "completed",
+    ];
+
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: `status must be one of: ${validStatuses.join(", ")}, or "all"`,
+          field: "status",
+          timestamp: new Date().toISOString(),
+          requestId: req.requestId,
+        },
+      });
+    }
+  }
+
+  next();
+};
+
+/**
+ * Validate work mode filter
+ */
+export const validateWorkModeFilter = (req, res, next) => {
+  const { workMode } = req.query;
+
+  if (workMode !== undefined) {
+    const validModes = ["remote", "onsite", "hybrid"];
+
+    if (!validModes.includes(workMode)) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: `workMode must be one of: ${validModes.join(", ")}`,
+          field: "workMode",
+          timestamp: new Date().toISOString(),
+          requestId: req.requestId,
+        },
+      });
+    }
+  }
+
+  next();
+};
+
+/**
  * Catch-all validation error handler for unexpected errors
  */
 export const catchValidationErrors = (err, req, res, next) => {

@@ -313,6 +313,16 @@
               "React"
             ]
           },
+          "optionalSkills": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "TypeScript",
+              "Docker"
+            ]
+          },
           "duration": {
             "type": "string",
             "example": "6 months"
@@ -338,20 +348,233 @@
             "type": "string",
             "enum": [
               "draft",
-              "active",
+              "pending_admin_verification",
+              "admin_approved",
+              "admin_rejected",
+              "mentor_rejected",
+              "open_for_applications",
               "closed",
-              "completed"
+              "cancelled"
             ],
-            "example": "active"
+            "example": "open_for_applications",
+            "description": "Internship workflow status"
           },
           "slots": {
             "type": "integer",
             "example": 5
           },
+          "slotsRemaining": {
+            "type": "integer",
+            "example": 3,
+            "description": "Available slots after acceptances"
+          },
+          "appliedCount": {
+            "type": "integer",
+            "example": 15,
+            "description": "Total applications received"
+          },
           "startDate": {
             "type": "string",
             "format": "date",
             "example": "2024-06-01"
+          },
+          "applicationDeadline": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2024-05-15T23:59:59Z"
+          },
+          "responsibilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "Develop features",
+              "Write tests"
+            ]
+          },
+          "learningOpportunities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "Mentorship",
+              "Code reviews"
+            ]
+          },
+          "eligibilityRequirements": {
+            "type": "object",
+            "properties": {
+              "minYear": {
+                "type": "integer",
+                "example": 2
+              },
+              "minReadinessScore": {
+                "type": "number",
+                "example": 60
+              },
+              "requiredModules": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "adminReview": {
+            "type": "object",
+            "properties": {
+              "reviewedBy": {
+                "type": "string",
+                "example": "ADM-001"
+              },
+              "reviewedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "decision": {
+                "type": "string",
+                "enum": [
+                  "approved",
+                  "rejected"
+                ]
+              },
+              "comments": {
+                "type": "string"
+              },
+              "reasons": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Admin verification details"
+          },
+          "mentorApproval": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "pending",
+                  "approved",
+                  "rejected"
+                ],
+                "default": "pending"
+              },
+              "mentorId": {
+                "type": "string",
+                "example": "MEN-001"
+              },
+              "approvedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "comments": {
+                "type": "string"
+              },
+              "department": {
+                "type": "string"
+              }
+            },
+            "description": "Mentor approval details"
+          },
+          "aiTags": {
+            "type": "object",
+            "properties": {
+              "primarySkills": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "example": [
+                  "JavaScript",
+                  "React",
+                  "Node.js"
+                ]
+              },
+              "difficulty": {
+                "type": "string",
+                "enum": [
+                  "beginner",
+                  "intermediate",
+                  "advanced"
+                ],
+                "example": "intermediate"
+              },
+              "careerPath": {
+                "type": "string",
+                "example": "Software Engineering"
+              },
+              "industryFit": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "example": [
+                  "Technology",
+                  "Startups"
+                ]
+              },
+              "learningIntensity": {
+                "type": "string",
+                "example": "moderate"
+              },
+              "technicalDepth": {
+                "type": "string",
+                "example": "moderate"
+              },
+              "generatedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "description": "AI-generated tags from Gemini API"
+          },
+          "auditTrail": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "timestamp": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "actor": {
+                  "type": "string"
+                },
+                "actorRole": {
+                  "type": "string"
+                },
+                "action": {
+                  "type": "string"
+                },
+                "fromStatus": {
+                  "type": "string"
+                },
+                "toStatus": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Complete audit trail of status changes"
+          },
+          "postedBy": {
+            "type": "string",
+            "example": "COM-2024001"
+          },
+          "postedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "closedAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
@@ -476,6 +699,34 @@
     {
       "name": "Testing",
       "description": "Test endpoints for external services (Email, S3, Queue, Gemini)"
+    },
+    {
+      "name": "Internship Verification",
+      "description": "Admin internship verification workflow endpoints"
+    },
+    {
+      "name": "Internship Approval",
+      "description": "Mentor internship approval workflow endpoints"
+    },
+    {
+      "name": "Internships",
+      "description": "Internship management endpoints"
+    },
+    {
+      "name": "Applications",
+      "description": "Application management endpoints"
+    },
+    {
+      "name": "Analytics",
+      "description": "Analytics and reporting endpoints"
+    },
+    {
+      "name": "Student Management",
+      "description": "Mentor student management endpoints"
+    },
+    {
+      "name": "Dashboard",
+      "description": "Dashboard endpoints for all user roles"
     }
   ],
   "paths": {
@@ -495,6 +746,19 @@
     "/api/admins/companies/pending": {
       "get": {
         "summary": "Get pending companies",
+        "tags": [
+          "Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/admins/companies": {
+      "get": {
+        "summary": "Get companies (filter by status)",
         "tags": [
           "Admin"
         ],
@@ -534,6 +798,19 @@
     "/api/admins/companies/{companyId}/reject": {
       "post": {
         "summary": "Reject company",
+        "tags": [
+          "Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/admins/companies/:companyId/block": {
+      "post": {
+        "summary": "Block a company",
         "tags": [
           "Admin"
         ],
@@ -596,11 +873,141 @@
         ]
       }
     },
-    "/api/admins/credits/process": {
-      "post": {
-        "summary": "Process credits",
+    "/api/admins/credit-requests/pending": {
+      "get": {
+        "summary": "Get pending credit requests for admin approval",
         "tags": [
-          "Admin"
+          "Admin - Credit Transfer"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/admins/credit-requests/{requestId}": {
+      "get": {
+        "summary": "Get credit request details for admin review",
+        "tags": [
+          "Admin - Credit Transfer"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/admins/credit-requests/{requestId}/review": {
+      "post": {
+        "summary": "Submit admin review (approve/reject)",
+        "tags": [
+          "Admin - Credit Transfer"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/admins/credit-requests/{requestId}/resolve": {
+      "post": {
+        "summary": "Resolve administrative hold on credit request",
+        "tags": [
+          "Admin - Credit Transfer"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/admins/credit-requests/analytics": {
+      "get": {
+        "summary": "Get system-wide credit transfer analytics",
+        "tags": [
+          "Admin - Credit Transfer"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/admins/credit-requests/export": {
+      "get": {
+        "summary": "Export credit transfer report (CSV/JSON)",
+        "tags": [
+          "Admin - Credit Transfer"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/admins/credit-requests/bottlenecks": {
+      "get": {
+        "summary": "Get approval pipeline bottleneck analysis",
+        "tags": [
+          "Admin - Credit Transfer"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/admins/credit-requests/overdue": {
+      "get": {
+        "summary": "Get all overdue credit requests",
+        "tags": [
+          "Admin - Credit Transfer"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/admins/credit-requests/reminders/stats": {
+      "get": {
+        "summary": "Get reminder statistics for overdue credit requests",
+        "tags": [
+          "Admin - Credit Transfer"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/admins/credit-requests/reminders/send": {
+      "post": {
+        "summary": "Manually trigger sending reminders for overdue credit requests",
+        "tags": [
+          "Admin - Credit Transfer"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/admins/credit-requests/reminders/schedule": {
+      "post": {
+        "summary": "Schedule automatic reminder job",
+        "tags": [
+          "Admin - Credit Transfer"
         ],
         "security": [
           {
@@ -672,6 +1079,481 @@
             "bearerAuth": []
           }
         ]
+      }
+    },
+    "/api/admins/internships/{internshipId}/approve": {
+      "post": {
+        "summary": "Approve internship (legacy endpoint)",
+        "tags": [
+          "Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/admins/internships/{internshipId}/reject": {
+      "post": {
+        "summary": "Reject internship (legacy endpoint)",
+        "tags": [
+          "Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/admins/internships": {
+      "get": {
+        "summary": "Get internships (filter by status)",
+        "tags": [
+          "Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/admins/internships/pending": {
+      "get": {
+        "summary": "List pending internship verifications",
+        "tags": [
+          "Admin - Internship Verification"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Page number"
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Items per page"
+          },
+          {
+            "in": "query",
+            "name": "department",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by department"
+          },
+          {
+            "in": "query",
+            "name": "companyId",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by company ID"
+          }
+        ]
+      }
+    },
+    "/api/admins/internships/{id}/approve": {
+      "post": {
+        "summary": "Approve internship posting",
+        "tags": [
+          "Admin - Internship Verification"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Internship ID"
+          }
+        ]
+      }
+    },
+    "/api/admins/internships/{id}/reject": {
+      "post": {
+        "summary": "Reject internship posting with reasons",
+        "tags": [
+          "Admin - Internship Verification"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Internship ID"
+          }
+        ]
+      }
+    },
+    "/api/admins/internships/{id}": {
+      "get": {
+        "summary": "Get internship details with company history",
+        "tags": [
+          "Admin - Internship Verification"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Internship ID"
+          }
+        ]
+      }
+    },
+    "/api/admins/analytics": {
+      "get": {
+        "summary": "Get system-wide analytics",
+        "tags": [
+          "Admin - Analytics"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "dateFrom",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Start date for analytics"
+          },
+          {
+            "in": "query",
+            "name": "dateTo",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "End date for analytics"
+          }
+        ]
+      }
+    },
+    "/api/admins/analytics/companies": {
+      "get": {
+        "summary": "Get company performance metrics",
+        "tags": [
+          "Admin - Analytics"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "dateFrom",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "dateTo",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sortBy",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "averageRating",
+                "internshipsPosted",
+                "applicationsReceived",
+                "completionRate"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "/api/admins/analytics/departments": {
+      "get": {
+        "summary": "Get department performance metrics",
+        "tags": [
+          "Admin - Analytics"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "dateFrom",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "dateTo",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "department",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Specific department to analyze"
+          }
+        ]
+      }
+    },
+    "/api/admins/analytics/mentors": {
+      "get": {
+        "summary": "Get mentor performance metrics",
+        "tags": [
+          "Admin - Analytics"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "dateFrom",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "dateTo",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "department",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sortBy",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "approvalRate",
+                "approvalsProcessed",
+                "averageResponseTime",
+                "studentsSupervised"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "/api/admins/analytics/students": {
+      "get": {
+        "summary": "Get student performance metrics",
+        "tags": [
+          "Admin - Analytics"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "department",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "minReadinessScore",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "minCredits",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/api/admins/reappeals": {
+      "get": {
+        "summary": "Get all reappeal requests with filtering",
+        "tags": [
+          "Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/admins/reappeals/{companyId}/approve": {
+      "post": {
+        "summary": "Approve a reappeal request",
+        "tags": [
+          "Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/admins/reappeals/{companyId}/reject": {
+      "post": {
+        "summary": "Reject a reappeal request",
+        "tags": [
+          "Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/applications/{id}/status": {
+      "patch": {
+        "summary": "Update application status",
+        "tags": [
+          "Applications"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "status"
+                ],
+                "properties": {
+                  "status": {
+                    "type": "string"
+                  },
+                  "feedback": {
+                    "type": "string"
+                  },
+                  "rejectionReason": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Status updated"
+          }
+        }
       }
     },
     "/api/auth/students/register": {
@@ -831,6 +1713,37 @@
         ]
       }
     },
+    "/api/companies/applications": {
+      "get": {
+        "summary": "Get company applications",
+        "tags": [
+          "Companies"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "internshipId",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by internship ID"
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by application status"
+          }
+        ]
+      }
+    },
     "/api/companies/dashboard": {
       "get": {
         "summary": "Get company dashboard",
@@ -893,7 +1806,18 @@
       }
     },
     "/api/companies/internships/{internshipId}": {
-      "put": {
+      "get": {
+        "summary": "Get internship by ID",
+        "tags": [
+          "Companies"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "patch": {
         "summary": "Update internship",
         "tags": [
           "Companies"
@@ -931,13 +1855,81 @@
     },
     "/api/companies/internships/{internshipId}/applicants": {
       "get": {
-        "summary": "Get applicants for internship",
+        "summary": "Get applicants for internship with filters",
         "tags": [
           "Companies"
         ],
         "security": [
           {
             "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "internshipId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "companyFeedbackStatus",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/api/companies/internships/{internshipId}/metrics": {
+      "get": {
+        "summary": "Get internship-specific metrics",
+        "tags": [
+          "Companies"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "internshipId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
           }
         ]
       }
@@ -970,7 +1962,117 @@
     },
     "/api/companies/applications/reject": {
       "post": {
-        "summary": "Reject candidates",
+        "summary": "Reject candidates (bulk)",
+        "tags": [
+          "Companies"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/companies/applications/approve": {
+      "post": {
+        "summary": "Approve application",
+        "tags": [
+          "Companies"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "applicationId"
+                ],
+                "properties": {
+                  "applicationId": {
+                    "type": "string"
+                  },
+                  "feedback": {
+                    "type": "string"
+                  },
+                  "nextSteps": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/companies/applications/reject-single": {
+      "post": {
+        "summary": "Reject application",
+        "tags": [
+          "Companies"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "applicationId"
+                ],
+                "properties": {
+                  "applicationId": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string"
+                  },
+                  "feedback": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/companies/applications/{applicationId}": {
+      "get": {
+        "summary": "Get application details",
+        "tags": [
+          "Companies"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "applicationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/companies/interns": {
+      "get": {
+        "summary": "Get active interns",
         "tags": [
           "Companies"
         ],
@@ -984,6 +2086,32 @@
     "/api/companies/interns/progress": {
       "get": {
         "summary": "Get intern progress",
+        "tags": [
+          "Companies"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/companies/interns/{studentId}/logbooks": {
+      "get": {
+        "summary": "Get intern logbooks",
+        "tags": [
+          "Companies"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/companies/interns/{applicationId}/complete": {
+      "post": {
+        "summary": "Mark internship as complete",
         "tags": [
           "Companies"
         ],
@@ -1033,6 +2161,276 @@
         ]
       }
     },
+    "/api/companies/analytics": {
+      "get": {
+        "summary": "Get company analytics with date range",
+        "tags": [
+          "Companies"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "dateFrom",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Start date for analytics period"
+          },
+          {
+            "in": "query",
+            "name": "dateTo",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "End date for analytics period"
+          }
+        ]
+      }
+    },
+    "/api/companies/analytics/export": {
+      "get": {
+        "summary": "Export analytics report",
+        "tags": [
+          "Companies"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "format",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "csv",
+                "pdf"
+              ],
+              "default": "csv"
+            },
+            "description": "Export format"
+          },
+          {
+            "in": "query",
+            "name": "dateFrom",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "dateTo",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ]
+      }
+    },
+    "/api/companies/re-appeal": {
+      "post": {
+        "summary": "Re-appeal rejection",
+        "tags": [
+          "Companies"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Re-appeal submitted successfully"
+          },
+          "400": {
+            "description": "Only rejected companies can re-appeal"
+          }
+        }
+      }
+    },
+    "/api/companies/reappeal": {
+      "post": {
+        "summary": "Submit reappeal request for blocked company",
+        "tags": [
+          "Companies"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "message"
+                ],
+                "properties": {
+                  "message": {
+                    "type": "string",
+                    "minLength": 10,
+                    "maxLength": 2000,
+                    "description": "Reappeal message explaining why the company should be unblocked"
+                  },
+                  "attachment": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Optional supporting document (PDF, JPG, PNG, max 10MB)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reappeal submitted successfully"
+          },
+          "400": {
+            "description": "Validation error or invalid status"
+          },
+          "403": {
+            "description": "Cooldown period active"
+          },
+          "429": {
+            "description": "Too many reappeal attempts"
+          }
+        }
+      }
+    },
+    "/api/companies/reappeal/status": {
+      "get": {
+        "summary": "Get reappeal status for blocked company",
+        "tags": [
+          "Companies"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reappeal status retrieved successfully"
+          }
+        }
+      }
+    },
+    "/api/companies/completions/:completionId/mark-complete": {
+      "put": {
+        "summary": "Mark internship completion as complete",
+        "tags": [
+          "Companies"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "completionId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The completion ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "evaluationScore",
+                  "evaluationComments"
+                ],
+                "properties": {
+                  "evaluationScore": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 10,
+                    "description": "Company evaluation score (0-10)"
+                  },
+                  "evaluationComments": {
+                    "type": "string",
+                    "minLength": 10,
+                    "maxLength": 1000,
+                    "description": "Company evaluation comments"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Internship completion marked as complete"
+          },
+          "400": {
+            "description": "Validation error or milestones not met"
+          },
+          "404": {
+            "description": "Completion not found"
+          }
+        }
+      }
+    },
+    "/api/companies/completions/completed": {
+      "get": {
+        "summary": "Get list of completed internships",
+        "tags": [
+          "Companies"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            },
+            "description": "Page number"
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            },
+            "description": "Items per page"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of completed internships"
+          }
+        }
+      }
+    },
     "/api/health": {
       "get": {
         "summary": "Health check endpoint",
@@ -1069,6 +2467,211 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/internships/browse": {
+      "get": {
+        "summary": "Browse internships",
+        "tags": [
+          "Internships"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "department",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "location",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workMode",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "skills",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "minStipend",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "maxStipend",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of internships"
+          }
+        }
+      }
+    },
+    "/api/interviews/start": {
+      "post": {
+        "summary": "Start interview practice",
+        "tags": [
+          "Interviews"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/interviews/{sessionId}/answer": {
+      "post": {
+        "summary": "Submit interview answer",
+        "tags": [
+          "Interviews"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/interviews/{sessionId}": {
+      "get": {
+        "summary": "Get interview session details",
+        "tags": [
+          "Interviews"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/logbooks": {
+      "post": {
+        "summary": "Submit a new logbook entry",
+        "tags": [
+          "Logbooks"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "internshipId",
+                  "weekNumber",
+                  "activities",
+                  "startDate",
+                  "endDate",
+                  "hoursWorked"
+                ],
+                "properties": {
+                  "internshipId": {
+                    "type": "string"
+                  },
+                  "weekNumber": {
+                    "type": "number"
+                  },
+                  "startDate": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "endDate": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "hoursWorked": {
+                    "type": "number"
+                  },
+                  "activities": {
+                    "type": "string"
+                  },
+                  "tasksCompleted": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "skillsUsed": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "challenges": {
+                    "type": "string"
+                  },
+                  "learnings": {
+                    "type": "string"
+                  },
+                  "attachments": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Logbook submitted successfully"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "409": {
+            "description": "Logbook already exists for this week"
           }
         }
       }
@@ -1253,9 +2856,743 @@
         ]
       }
     },
+    "/api/mentors/students": {
+      "get": {
+        "summary": "Get assigned students",
+        "tags": [
+          "Mentors"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/mentor/internships/pending": {
+      "get": {
+        "summary": "List pending internships for mentor approval",
+        "tags": [
+          "Mentors",
+          "Internships"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "in": "query",
+            "name": "sortBy",
+            "schema": {
+              "type": "string",
+              "default": "postedAt"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sortOrder",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "default": "desc"
+            }
+          }
+        ]
+      }
+    },
+    "/api/mentor/internships/{internshipId}": {
+      "get": {
+        "summary": "Get internship details for review",
+        "tags": [
+          "Mentors",
+          "Internships"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "internshipId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/mentor/internships/{internshipId}/approve": {
+      "post": {
+        "summary": "Approve internship for department",
+        "tags": [
+          "Mentors",
+          "Internships"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "internshipId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "comments": {
+                    "type": "string",
+                    "description": "Optional approval comments"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mentor/internships/{internshipId}/reject": {
+      "post": {
+        "summary": "Reject internship with reasons",
+        "tags": [
+          "Mentors",
+          "Internships"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "internshipId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "reasons"
+                ],
+                "properties": {
+                  "reasons": {
+                    "type": "string",
+                    "description": "Rejection reasons"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mentor/students": {
+      "get": {
+        "summary": "List assigned students with filters",
+        "tags": [
+          "Mentors",
+          "Students"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "in": "query",
+            "name": "sortBy",
+            "schema": {
+              "type": "string",
+              "default": "profile.name"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sortOrder",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "default": "asc"
+            }
+          },
+          {
+            "in": "query",
+            "name": "internshipStatus",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "active",
+                "applied",
+                "none"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "performanceLevel",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "high",
+                "medium",
+                "low"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "creditCompletion",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "completed",
+                "in_progress",
+                "not_started"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/mentor/students/{studentId}": {
+      "get": {
+        "summary": "Get student details with internship history",
+        "tags": [
+          "Mentors",
+          "Students"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "studentId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/mentor/students/{studentId}/applications": {
+      "get": {
+        "summary": "Get student applications",
+        "tags": [
+          "Mentors",
+          "Students"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "studentId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          }
+        ]
+      }
+    },
+    "/api/mentor/analytics": {
+      "get": {
+        "summary": "Get mentor-specific analytics",
+        "tags": [
+          "Mentors",
+          "Analytics"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "dateFrom",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "dateTo",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ]
+      }
+    },
+    "/api/mentor/analytics/department": {
+      "get": {
+        "summary": "Get department analytics",
+        "tags": [
+          "Mentors",
+          "Analytics"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "dateFrom",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "dateTo",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ]
+      }
+    },
+    "/api/mentors/credits/pending": {
+      "get": {
+        "summary": "Get pending credit requests (legacy)",
+        "tags": [
+          "Mentors"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/mentors/credits/{requestId}/decide": {
+      "post": {
+        "summary": "Approve (escalate) or reject credit request (legacy)",
+        "tags": [
+          "Mentors"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/mentors/{mentorId}/credit-requests/pending": {
+      "get": {
+        "summary": "Get pending credit requests for mentor review",
+        "tags": [
+          "Mentors",
+          "Credit Requests"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "mentorId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Mentor ID"
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            },
+            "description": "Page number"
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "default": 20
+            },
+            "description": "Items per page"
+          },
+          {
+            "in": "query",
+            "name": "sortBy",
+            "schema": {
+              "type": "string",
+              "default": "requestedAt"
+            },
+            "description": "Sort field"
+          }
+        ]
+      }
+    },
+    "/api/mentors/{mentorId}/credit-requests/{requestId}": {
+      "get": {
+        "summary": "Get credit request details for review",
+        "tags": [
+          "Mentors",
+          "Credit Requests"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "mentorId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Mentor ID"
+          },
+          {
+            "in": "path",
+            "name": "requestId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Credit Request ID"
+          }
+        ]
+      }
+    },
+    "/api/mentors/{mentorId}/credit-requests/{requestId}/review": {
+      "post": {
+        "summary": "Submit mentor review (approve/reject)",
+        "tags": [
+          "Mentors",
+          "Credit Requests"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "mentorId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Mentor ID"
+          },
+          {
+            "in": "path",
+            "name": "requestId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Credit Request ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "decision"
+                ],
+                "properties": {
+                  "decision": {
+                    "type": "string",
+                    "enum": [
+                      "approved",
+                      "rejected"
+                    ]
+                  },
+                  "feedback": {
+                    "type": "string",
+                    "description": "Required when rejecting"
+                  },
+                  "qualityCriteria": {
+                    "type": "object",
+                    "properties": {
+                      "logbookComplete": {
+                        "type": "boolean"
+                      },
+                      "reportQuality": {
+                        "type": "boolean"
+                      },
+                      "learningOutcomes": {
+                        "type": "boolean"
+                      },
+                      "companyEvaluation": {
+                        "type": "boolean"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mentors/{mentorId}/credit-requests/history": {
+      "get": {
+        "summary": "Get mentor's review history",
+        "tags": [
+          "Mentors",
+          "Credit Requests"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "mentorId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Mentor ID"
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by status"
+          },
+          {
+            "in": "query",
+            "name": "dateRange",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Date range filter (startDate,endDate)"
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            },
+            "description": "Page number"
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "default": 20
+            },
+            "description": "Items per page"
+          }
+        ]
+      }
+    },
+    "/api/mentors/{mentorId}/credit-requests/analytics": {
+      "get": {
+        "summary": "Get mentor review analytics",
+        "tags": [
+          "Mentors",
+          "Credit Requests"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "mentorId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Mentor ID"
+          },
+          {
+            "in": "query",
+            "name": "dateRange",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Date range filter (startDate,endDate)"
+          }
+        ]
+      }
+    },
+    "/api/notifications": {
+      "get": {
+        "summary": "Get user notifications",
+        "tags": [
+          "Notifications"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/notifications/{id}/read": {
+      "patch": {
+        "summary": "Mark notification as read",
+        "tags": [
+          "Notifications"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/notifications/read-all": {
+      "patch": {
+        "summary": "Mark all notifications as read",
+        "tags": [
+          "Notifications"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
     "/api/students/dashboard": {
       "get": {
-        "summary": "Get student dashboard",
+        "summary": "Get student dashboard with mentor info",
+        "tags": [
+          "Students"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/students/profile": {
+      "get": {
+        "summary": "Get profile with credits and history",
         "tags": [
           "Students"
         ],
@@ -1268,13 +3605,92 @@
     },
     "/api/students/internships": {
       "get": {
-        "summary": "Browse available internships",
+        "summary": "Browse available internships with AI match scores",
         "tags": [
           "Students"
         ],
         "security": [
           {
             "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Page number"
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Items per page"
+          },
+          {
+            "in": "query",
+            "name": "location",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by location"
+          },
+          {
+            "in": "query",
+            "name": "workMode",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "remote",
+                "onsite",
+                "hybrid"
+              ]
+            },
+            "description": "Filter by work mode"
+          },
+          {
+            "in": "query",
+            "name": "skills",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Comma-separated list of skills"
+          },
+          {
+            "in": "query",
+            "name": "minStipend",
+            "schema": {
+              "type": "number"
+            },
+            "description": "Minimum stipend"
+          },
+          {
+            "in": "query",
+            "name": "maxStipend",
+            "schema": {
+              "type": "number"
+            },
+            "description": "Maximum stipend"
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Search query"
+          },
+          {
+            "in": "query",
+            "name": "includeMatchScore",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Include AI match scores"
           }
         ]
       }
@@ -1292,7 +3708,31 @@
         ]
       }
     },
-    "/api/students/applications": {
+    "/api/students/internships/{internshipId}": {
+      "get": {
+        "summary": "Get internship details with match analysis",
+        "tags": [
+          "Students"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "internshipId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Internship ID"
+          }
+        ]
+      }
+    },
+    "/api/students/internships/{internshipId}/apply": {
       "post": {
         "summary": "Apply to internship",
         "tags": [
@@ -1302,10 +3742,23 @@
           {
             "bearerAuth": []
           }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "internshipId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Internship ID"
+          }
         ]
-      },
+      }
+    },
+    "/api/students/applications": {
       "get": {
-        "summary": "Get my applications",
+        "summary": "List my applications with status",
         "tags": [
           "Students"
         ],
@@ -1313,10 +3766,58 @@
           {
             "bearerAuth": []
           }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by status"
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Page number"
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Items per page"
+          }
         ]
       }
     },
     "/api/students/applications/{applicationId}": {
+      "get": {
+        "summary": "Get application details",
+        "tags": [
+          "Students"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "applicationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Application ID"
+          }
+        ]
+      },
       "delete": {
         "summary": "Withdraw application",
         "tags": [
@@ -1475,6 +3976,129 @@
         "summary": "Chatbot query",
         "tags": [
           "Students"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/students/internships/completed": {
+      "get": {
+        "summary": "Get completed internships with credit request availability",
+        "tags": [
+          "Students"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/students/:studentId/credit-requests": {
+      "post": {
+        "summary": "Create a new credit request",
+        "tags": [
+          "Students",
+          "Credit Requests"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "get": {
+        "summary": "Get all credit requests for a student",
+        "tags": [
+          "Students",
+          "Credit Requests"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/students/:studentId/credit-requests/:requestId": {
+      "get": {
+        "summary": "Get credit request details",
+        "tags": [
+          "Students",
+          "Credit Requests"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/students/:studentId/credit-requests/:requestId/resubmit": {
+      "put": {
+        "summary": "Resubmit a rejected credit request",
+        "tags": [
+          "Students",
+          "Credit Requests"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/students/:studentId/credit-requests/:requestId/status": {
+      "get": {
+        "summary": "Get real-time status of a credit request",
+        "tags": [
+          "Students",
+          "Credit Requests"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/students/:studentId/credit-requests/:requestId/reminder": {
+      "post": {
+        "summary": "Send a reminder to the current reviewer",
+        "tags": [
+          "Students",
+          "Credit Requests"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/students/:studentId/credits/history": {
+      "get": {
+        "summary": "Get credit history for a student",
+        "tags": [
+          "Students",
+          "Credit Requests"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/students/:studentId/credits/certificate/:requestId": {
+      "get": {
+        "summary": "Download credit transfer certificate",
+        "tags": [
+          "Students",
+          "Credit Requests"
         ],
         "security": [
           {
@@ -1878,6 +4502,71 @@
           },
           "403": {
             "description": "Forbidden - Admin only"
+          }
+        }
+      }
+    },
+    "/api/upload": {
+      "post": {
+        "summary": "Upload a file",
+        "tags": [
+          "Upload"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "File uploaded successfully"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a file",
+        "tags": [
+          "Upload"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "File deleted successfully"
           }
         }
       }

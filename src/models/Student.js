@@ -71,6 +71,7 @@ const profileSchema = new Schema(
     skills: { type: [String], default: [] },
     interests: { type: [String], default: [] },
     resume: String,
+    resumeUrl: String, // R2 URL for default resume
     profileImage: String,
     profileImageFileId: String, // ImageKit fileId for deletion
   },

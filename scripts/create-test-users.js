@@ -33,7 +33,11 @@ async function createTestUsers() {
           department: "Computer Science",
           year: 3,
           college: "Test College",
+          rollNumber: "CS2021001",
           phone: "1234567890",
+          bio: "A passionate computer science student interested in software development and AI.",
+          skills: ["JavaScript", "Python", "React", "Node.js"],
+          interests: ["Web Development", "Machine Learning", "Cloud Computing"],
         },
       },
       admin: {
@@ -48,6 +52,10 @@ async function createTestUsers() {
         profile: {
           name: "Test Mentor",
           department: "Computer Science",
+          designation: "Senior Professor",
+          phone: "9876543210",
+          bio: "Experienced mentor with 10+ years in academia and industry.",
+          expertiseAreas: ["Software Engineering", "Data Structures", "Algorithms"],
         },
       },
       company: {
@@ -59,13 +67,17 @@ async function createTestUsers() {
         address: "123 Test Street, Test City, Test Country",
         documents: {
           cinNumber: "U12345AB2020PTC123456",
+          gstCertificate: "https://example.com/gst-cert.pdf",
+          registrationCertificate: "https://example.com/reg-cert.pdf",
+          addressProof: "https://example.com/address-proof.pdf",
         },
         pointOfContact: {
           name: "Test Contact Person",
+          designation: "HR Manager",
           email: "contact@testcompany.com",
           phone: "9876543210",
         },
-        about: "A test company for development and testing purposes.",
+        about: "A test company for development and testing purposes. We specialize in software development and IT consulting.",
       },
     };
 

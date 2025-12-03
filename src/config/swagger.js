@@ -294,6 +294,13 @@ const options = {
               },
               example: ["JavaScript", "Node.js", "React"],
             },
+            optionalSkills: {
+              type: "array",
+              items: {
+                type: "string",
+              },
+              example: ["TypeScript", "Docker"],
+            },
             duration: {
               type: "string",
               example: "6 months",
@@ -313,17 +320,202 @@ const options = {
             },
             status: {
               type: "string",
-              enum: ["draft", "active", "closed", "completed"],
-              example: "active",
+              enum: ["draft", "pending_admin_verification", "admin_approved", "admin_rejected", "mentor_rejected", "open_for_applications", "closed", "cancelled"],
+              example: "open_for_applications",
+              description: "Internship workflow status",
             },
             slots: {
               type: "integer",
               example: 5,
             },
+            slotsRemaining: {
+              type: "integer",
+              example: 3,
+              description: "Available slots after acceptances",
+            },
+            appliedCount: {
+              type: "integer",
+              example: 15,
+              description: "Total applications received",
+            },
             startDate: {
               type: "string",
               format: "date",
               example: "2024-06-01",
+            },
+            applicationDeadline: {
+              type: "string",
+              format: "date-time",
+              example: "2024-05-15T23:59:59Z",
+            },
+            responsibilities: {
+              type: "array",
+              items: {
+                type: "string",
+              },
+              example: ["Develop features", "Write tests"],
+            },
+            learningOpportunities: {
+              type: "array",
+              items: {
+                type: "string",
+              },
+              example: ["Mentorship", "Code reviews"],
+            },
+            eligibilityRequirements: {
+              type: "object",
+              properties: {
+                minYear: {
+                  type: "integer",
+                  example: 2,
+                },
+                minReadinessScore: {
+                  type: "number",
+                  example: 60,
+                },
+                requiredModules: {
+                  type: "array",
+                  items: {
+                    type: "string",
+                  },
+                },
+              },
+            },
+            adminReview: {
+              type: "object",
+              properties: {
+                reviewedBy: {
+                  type: "string",
+                  example: "ADM-001",
+                },
+                reviewedAt: {
+                  type: "string",
+                  format: "date-time",
+                },
+                decision: {
+                  type: "string",
+                  enum: ["approved", "rejected"],
+                },
+                comments: {
+                  type: "string",
+                },
+                reasons: {
+                  type: "array",
+                  items: {
+                    type: "string",
+                  },
+                },
+              },
+              description: "Admin verification details",
+            },
+            mentorApproval: {
+              type: "object",
+              properties: {
+                status: {
+                  type: "string",
+                  enum: ["pending", "approved", "rejected"],
+                  default: "pending",
+                },
+                mentorId: {
+                  type: "string",
+                  example: "MEN-001",
+                },
+                approvedAt: {
+                  type: "string",
+                  format: "date-time",
+                },
+                comments: {
+                  type: "string",
+                },
+                department: {
+                  type: "string",
+                },
+              },
+              description: "Mentor approval details",
+            },
+            aiTags: {
+              type: "object",
+              properties: {
+                primarySkills: {
+                  type: "array",
+                  items: {
+                    type: "string",
+                  },
+                  example: ["JavaScript", "React", "Node.js"],
+                },
+                difficulty: {
+                  type: "string",
+                  enum: ["beginner", "intermediate", "advanced"],
+                  example: "intermediate",
+                },
+                careerPath: {
+                  type: "string",
+                  example: "Software Engineering",
+                },
+                industryFit: {
+                  type: "array",
+                  items: {
+                    type: "string",
+                  },
+                  example: ["Technology", "Startups"],
+                },
+                learningIntensity: {
+                  type: "string",
+                  example: "moderate",
+                },
+                technicalDepth: {
+                  type: "string",
+                  example: "moderate",
+                },
+                generatedAt: {
+                  type: "string",
+                  format: "date-time",
+                },
+              },
+              description: "AI-generated tags from Gemini API",
+            },
+            auditTrail: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  timestamp: {
+                    type: "string",
+                    format: "date-time",
+                  },
+                  actor: {
+                    type: "string",
+                  },
+                  actorRole: {
+                    type: "string",
+                  },
+                  action: {
+                    type: "string",
+                  },
+                  fromStatus: {
+                    type: "string",
+                  },
+                  toStatus: {
+                    type: "string",
+                  },
+                  reason: {
+                    type: "string",
+                  },
+                },
+              },
+              description: "Complete audit trail of status changes",
+            },
+            postedBy: {
+              type: "string",
+              example: "COM-2024001",
+            },
+            postedAt: {
+              type: "string",
+              format: "date-time",
+            },
+            closedAt: {
+              type: "string",
+              format: "date-time",
             },
           },
         },
@@ -435,6 +627,34 @@ const options = {
       {
         name: "Testing",
         description: "Test endpoints for external services (Email, S3, Queue, Gemini)",
+      },
+      {
+        name: "Internship Verification",
+        description: "Admin internship verification workflow endpoints",
+      },
+      {
+        name: "Internship Approval",
+        description: "Mentor internship approval workflow endpoints",
+      },
+      {
+        name: "Internships",
+        description: "Internship management endpoints",
+      },
+      {
+        name: "Applications",
+        description: "Application management endpoints",
+      },
+      {
+        name: "Analytics",
+        description: "Analytics and reporting endpoints",
+      },
+      {
+        name: "Student Management",
+        description: "Mentor student management endpoints",
+      },
+      {
+        name: "Dashboard",
+        description: "Dashboard endpoints for all user roles",
       },
     ],
   },

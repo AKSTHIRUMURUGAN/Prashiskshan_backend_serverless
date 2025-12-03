@@ -38,11 +38,14 @@ export const getAdminDashboard = async (req, res, next) => {
       rejectedCompanies,
       blockedCompanies,
       reappealCompanies,
+      pendingInternships,
+      verifiedInternships,
+      rejectedInternships,
     ] = await Promise.all([
       Student.countDocuments(),
       Mentor.countDocuments(),
       Company.countDocuments(),
-      Internship.countDocuments({ status: "approved" }),
+      Internship.countDocuments({ status: "admin_approved" }),
       Application.countDocuments(),
       Logbook.countDocuments({ status: { $in: ["submitted", "pending_mentor_review", "pending_company_review"] } }),
       Company.countDocuments({ status: "pending_verification" }),
@@ -50,6 +53,9 @@ export const getAdminDashboard = async (req, res, next) => {
       Company.countDocuments({ status: "rejected" }),
       Company.countDocuments({ status: "blocked" }),
       Company.countDocuments({ status: "reappeal" }),
+      Internship.countDocuments({ status: "pending_admin_verification" }),
+      Internship.countDocuments({ status: "admin_approved" }),
+      Internship.countDocuments({ status: "admin_rejected" }),
     ]);
 
     res.json(
@@ -69,6 +75,9 @@ export const getAdminDashboard = async (req, res, next) => {
             rejectedCompanies,
             blockedCompanies,
             reappealCompanies,
+            pendingInternships,
+            verifiedInternships,
+            rejectedInternships,
             pendingCreditApprovals: 0, // Placeholder as logic is not yet implemented
           },
         },
@@ -664,15 +673,30 @@ export const approveInternship = async (req, res, next) => {
     const internship = await Internship.findOne({ internshipId });
     if (!internship) throw createHttpError(404, "Internship not found");
 
-    internship.status = "approved";
+    const previousStatus = internship.status;
+    
+    // After admin approval, internship is approved and waits for mentor verification
+    internship.status = "admin_approved";
     internship.adminReview = {
       reviewedBy: admin.adminId,
       reviewedAt: new Date(),
       decision: "approved",
     };
+    
+    // Add to audit trail
+    internship.auditTrail.push({
+      timestamp: new Date(),
+      actor: admin.adminId,
+      actorRole: "admin",
+      action: "approve_internship",
+      fromStatus: previousStatus,
+      toStatus: "admin_approved",
+      reason: "Internship approved by admin, awaiting mentor verification",
+    });
+    
     await internship.save();
 
-    res.json(apiSuccess(internship, "Internship approved"));
+    res.json(apiSuccess(internship, "Internship approved successfully"));
   } catch (error) {
     next(error);
   }
@@ -689,13 +713,26 @@ export const rejectInternship = async (req, res, next) => {
     const internship = await Internship.findOne({ internshipId });
     if (!internship) throw createHttpError(404, "Internship not found");
 
-    internship.status = "rejected";
+    const previousStatus = internship.status;
+    internship.status = "admin_rejected";
     internship.adminReview = {
       reviewedBy: admin.adminId,
       reviewedAt: new Date(),
       decision: "rejected",
       comments: reason,
     };
+    
+    // Add to audit trail
+    internship.auditTrail.push({
+      timestamp: new Date(),
+      actor: admin.adminId,
+      actorRole: "admin",
+      action: "reject_internship",
+      fromStatus: previousStatus,
+      toStatus: "admin_rejected",
+      reason: reason,
+    });
+    
     await internship.save();
 
     res.json(apiSuccess(internship, "Internship rejected"));
@@ -707,16 +744,42 @@ export const rejectInternship = async (req, res, next) => {
 export const getInternships = async (req, res, next) => {
   try {
     await ensureAdminContext(req);
-    const { status } = req.query;
+    const { status, page = 1, limit = 10 } = req.query;
     const query = {};
     if (status) query.status = status;
 
+    // Calculate pagination
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Get total count
+    const total = await Internship.countDocuments(query);
+
+    // Get paginated internships
     const internships = await Internship.find(query)
       .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum)
       .populate("companyId", "companyName industry") // Populate company details
       .lean();
 
-    res.json(apiSuccess(internships, "Internships list"));
+    // Flatten company data for easier frontend consumption
+    const formattedInternships = internships.map(internship => ({
+      ...internship,
+      companyName: internship.companyId?.companyName || 'Unknown Company',
+      companyIndustry: internship.companyId?.industry,
+    }));
+
+    // Calculate pagination metadata
+    const pagination = {
+      total,
+      page: pageNum,
+      pages: Math.ceil(total / limitNum),
+      limit: limitNum,
+    };
+
+    res.json(apiSuccess({ internships: formattedInternships, pagination }, "Internships list"));
   } catch (error) {
     next(error);
   }
@@ -1094,6 +1157,478 @@ export const getOverdueCreditRequests = async (req, res, next) => {
       )
     );
   } catch (error) {
+    next(error);
+  }
+};
+
+// ============================================================================
+// Internship Verification Workflow Endpoints (Task 10.1)
+// Requirements: 2.2, 2.3
+// ============================================================================
+
+/**
+ * GET /api/admin/internships/pending
+ * List pending internships for admin verification
+ * Requirements: 2.2
+ */
+export const getPendingInternshipVerifications = async (req, res, next) => {
+  try {
+    await ensureAdminContext(req);
+    
+    const { 
+      page = 1, 
+      limit = 20, 
+      department, 
+      companyId,
+      sortBy = "postedAt",
+      sortOrder = "desc"
+    } = req.query;
+
+    const filters = {
+      status: "pending_admin_verification",
+      page: parseInt(page),
+      limit: parseInt(limit),
+      sortBy,
+      sortOrder,
+    };
+
+    if (department) filters.department = department;
+    if (companyId) filters.companyId = companyId;
+
+    const { internshipService } = await import("../services/internshipService.js");
+    const result = await internshipService.getInternshipsByStatus(
+      "pending_admin_verification",
+      filters
+    );
+
+    res.json(apiSuccess(result, "Pending internship verifications"));
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * POST /api/admin/internships/:id/approve
+ * Approve an internship posting
+ * Requirements: 2.2
+ */
+export const approveInternshipVerification = async (req, res, next) => {
+  try {
+    const admin = await ensureAdminContext(req);
+    const { id } = req.params; // This is the internshipId (custom string ID)
+    const { comments } = req.body;
+
+    const { approvalWorkflowService } = await import("../services/approvalWorkflowService.js");
+    
+    // Use admin MongoDB ObjectId for the service
+    const updatedInternship = await approvalWorkflowService.adminApprove(
+      id,
+      admin._id,
+      comments || ""
+    );
+
+    logger.info("Admin approved internship via verification endpoint", {
+      internshipId: id,
+      adminId: admin.adminId,
+    });
+
+    res.json(apiSuccess(updatedInternship, "Internship approved successfully"));
+  } catch (error) {
+    logger.error("Admin approval failed", {
+      internshipId: req.params.id,
+      error: error.message,
+    });
+    next(error);
+  }
+};
+
+/**
+ * POST /api/admin/internships/:id/reject
+ * Reject an internship posting with reasons
+ * Requirements: 2.3
+ */
+export const rejectInternshipVerification = async (req, res, next) => {
+  try {
+    const admin = await ensureAdminContext(req);
+    const { id } = req.params; // This is the internshipId (custom string ID)
+    const { reasons } = req.body;
+
+    // Validate reasons
+    if (!reasons || !Array.isArray(reasons) || reasons.length === 0) {
+      throw createHttpError(400, "At least one rejection reason is required");
+    }
+
+    const { approvalWorkflowService } = await import("../services/approvalWorkflowService.js");
+    
+    // Use admin MongoDB ObjectId for the service
+    const updatedInternship = await approvalWorkflowService.adminReject(
+      id,
+      admin._id,
+      reasons
+    );
+
+    logger.info("Admin rejected internship via verification endpoint", {
+      internshipId: id,
+      adminId: admin.adminId,
+      reasons,
+    });
+
+    res.json(apiSuccess(updatedInternship, "Internship rejected successfully"));
+  } catch (error) {
+    logger.error("Admin rejection failed", {
+      internshipId: req.params.id,
+      error: error.message,
+    });
+    next(error);
+  }
+};
+
+/**
+ * GET /api/admin/internships/:id
+ * Get internship details with company history for admin review
+ * Requirements: 2.2
+ */
+export const getInternshipDetailsForAdmin = async (req, res, next) => {
+  try {
+    await ensureAdminContext(req);
+    const { id } = req.params; // This is the internshipId (custom string ID)
+
+    // Get internship details
+    const internship = await Internship.findOne({ internshipId: id })
+      .populate("companyId", "companyId companyName industry status adminReview")
+      .lean();
+
+    if (!internship) {
+      throw createHttpError(404, "Internship not found");
+    }
+
+    // Get company history - other internships posted by this company
+    const companyHistory = await Internship.find({
+      companyId: internship.companyId._id,
+      internshipId: { $ne: id }, // Exclude current internship
+    })
+      .select("internshipId title status postedAt adminReview mentorApproval")
+      .sort({ postedAt: -1 })
+      .limit(10)
+      .lean();
+
+    // Get company's verification history
+    const company = await Company.findById(internship.companyId._id)
+      .select("companyId companyName status adminReview verificationHistory")
+      .lean();
+
+    // Format review history from audit trail
+    // Sort by timestamp descending (newest first) - Requirement 8.4
+    const reviewHistory = (internship.auditTrail || [])
+      .map(entry => ({
+        timestamp: entry.timestamp,
+        actor: entry.actor,
+        actorRole: entry.actorRole,
+        action: entry.action,
+        fromStatus: entry.fromStatus,
+        toStatus: entry.toStatus,
+        reason: entry.reason,
+        comments: entry.comments,
+        metadata: entry.metadata,
+      }))
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    // Combine data for admin review
+    const detailedView = {
+      internship,
+      company: {
+        companyId: company?.companyId,
+        companyName: company?.companyName,
+        status: company?.status,
+        adminReview: company?.adminReview,
+        verificationHistory: company?.verificationHistory || [],
+      },
+      companyHistory: {
+        totalInternships: companyHistory.length,
+        recentInternships: companyHistory,
+        approvedCount: companyHistory.filter(i => i.status === "admin_approved" || i.status === "open_for_applications").length,
+        rejectedCount: companyHistory.filter(i => i.status === "admin_rejected").length,
+      },
+      reviewHistory,
+    };
+
+    res.json(apiSuccess(detailedView, "Internship details for admin review"));
+  } catch (error) {
+    logger.error("Failed to get internship details for admin", {
+      internshipId: req.params.id,
+      error: error.message,
+    });
+    next(error);
+  }
+};
+
+// ============================================================================
+// Internship Analytics Endpoints (Task 10.2)
+// Requirements: 10.1, 10.2, 10.3, 10.4, 10.5
+// ============================================================================
+
+/**
+ * GET /api/admin/analytics
+ * Get system-wide analytics
+ * Requirements: 10.1
+ */
+export const getSystemAnalytics = async (req, res, next) => {
+  try {
+    await ensureAdminContext(req);
+    
+    const { dateFrom, dateTo } = req.query;
+
+    const { internshipAnalyticsService } = await import("../services/internshipAnalyticsService.js");
+    const analytics = await internshipAnalyticsService.getAdminAnalytics({
+      dateFrom,
+      dateTo,
+    });
+
+    res.json(apiSuccess(analytics, "System-wide analytics"));
+  } catch (error) {
+    logger.error("Failed to get system analytics", {
+      error: error.message,
+    });
+    next(error);
+  }
+};
+
+/**
+ * GET /api/admin/analytics/companies
+ * Get company performance metrics
+ * Requirements: 10.2
+ */
+export const getCompanyPerformanceMetrics = async (req, res, next) => {
+  try {
+    await ensureAdminContext(req);
+    
+    const { dateFrom, dateTo, limit = 20, sortBy = "averageRating" } = req.query;
+
+    const { internshipAnalyticsService } = await import("../services/internshipAnalyticsService.js");
+    
+    // Get admin analytics which includes company metrics
+    const analytics = await internshipAnalyticsService.getAdminAnalytics({
+      dateFrom,
+      dateTo,
+    });
+
+    // Extract and sort company metrics
+    let companyMetrics = analytics.companies.topPerformers || [];
+    
+    // Sort based on requested field
+    if (sortBy === "internshipsPosted") {
+      companyMetrics.sort((a, b) => b.internshipsPosted - a.internshipsPosted);
+    } else if (sortBy === "applicationsReceived") {
+      companyMetrics.sort((a, b) => b.applicationsReceived - a.applicationsReceived);
+    } else if (sortBy === "completionRate") {
+      companyMetrics.sort((a, b) => b.completionRate - a.completionRate);
+    } else {
+      // Default: averageRating
+      companyMetrics.sort((a, b) => b.averageRating - a.averageRating);
+    }
+
+    // Limit results
+    companyMetrics = companyMetrics.slice(0, parseInt(limit));
+
+    res.json(apiSuccess({
+      total: analytics.companies.total,
+      metrics: companyMetrics,
+      period: { dateFrom, dateTo },
+    }, "Company performance metrics"));
+  } catch (error) {
+    logger.error("Failed to get company performance metrics", {
+      error: error.message,
+    });
+    next(error);
+  }
+};
+
+/**
+ * GET /api/admin/analytics/departments
+ * Get department performance metrics
+ * Requirements: 10.3
+ */
+export const getDepartmentPerformanceMetrics = async (req, res, next) => {
+  try {
+    await ensureAdminContext(req);
+    
+    const { dateFrom, dateTo, department } = req.query;
+
+    const { internshipAnalyticsService } = await import("../services/internshipAnalyticsService.js");
+    
+    if (department) {
+      // Get specific department analytics
+      const analytics = await internshipAnalyticsService.getDepartmentAnalytics(
+        department,
+        { dateFrom, dateTo }
+      );
+      
+      res.json(apiSuccess(analytics, `${department} department analytics`));
+    } else {
+      // Get all departments from admin analytics
+      const analytics = await internshipAnalyticsService.getAdminAnalytics({
+        dateFrom,
+        dateTo,
+      });
+
+      res.json(apiSuccess({
+        departments: analytics.departments,
+        period: { dateFrom, dateTo },
+      }, "Department performance metrics"));
+    }
+  } catch (error) {
+    logger.error("Failed to get department performance metrics", {
+      error: error.message,
+    });
+    next(error);
+  }
+};
+
+/**
+ * GET /api/admin/analytics/mentors
+ * Get mentor performance metrics
+ * Requirements: 10.4
+ */
+export const getMentorPerformanceMetrics = async (req, res, next) => {
+  try {
+    await ensureAdminContext(req);
+    
+    const { dateFrom, dateTo, department, limit = 20, sortBy = "approvalRate" } = req.query;
+
+    const { internshipAnalyticsService } = await import("../services/internshipAnalyticsService.js");
+    
+    // Get admin analytics which includes mentor metrics
+    const analytics = await internshipAnalyticsService.getAdminAnalytics({
+      dateFrom,
+      dateTo,
+    });
+
+    // Extract mentor metrics
+    let mentorMetrics = analytics.mentors.topPerformers || [];
+    
+    // Filter by department if specified
+    if (department) {
+      mentorMetrics = mentorMetrics.filter(m => m.department === department);
+    }
+
+    // Sort based on requested field
+    if (sortBy === "approvalsProcessed") {
+      mentorMetrics.sort((a, b) => b.approvalsProcessed - a.approvalsProcessed);
+    } else if (sortBy === "averageResponseTime") {
+      mentorMetrics.sort((a, b) => a.averageResponseTime - b.averageResponseTime); // Lower is better
+    } else if (sortBy === "studentsSupervised") {
+      mentorMetrics.sort((a, b) => b.studentsSupervised - a.studentsSupervised);
+    } else {
+      // Default: approvalRate
+      mentorMetrics.sort((a, b) => b.approvalRate - a.approvalRate);
+    }
+
+    // Limit results
+    mentorMetrics = mentorMetrics.slice(0, parseInt(limit));
+
+    res.json(apiSuccess({
+      total: analytics.mentors.total,
+      metrics: mentorMetrics,
+      period: { dateFrom, dateTo },
+    }, "Mentor performance metrics"));
+  } catch (error) {
+    logger.error("Failed to get mentor performance metrics", {
+      error: error.message,
+    });
+    next(error);
+  }
+};
+
+/**
+ * GET /api/admin/analytics/students
+ * Get student performance metrics
+ * Requirements: 10.5
+ */
+export const getStudentPerformanceMetrics = async (req, res, next) => {
+  try {
+    await ensureAdminContext(req);
+    
+    const { 
+      department, 
+      minReadinessScore, 
+      minCredits,
+      page = 1,
+      limit = 50,
+    } = req.query;
+
+    // Build query
+    const query = {};
+    if (department) query["profile.department"] = department;
+    if (minReadinessScore) query.readinessScore = { $gte: parseFloat(minReadinessScore) };
+    if (minCredits) query["credits.earned"] = { $gte: parseFloat(minCredits) };
+
+    // Get students with pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const students = await Student.find(query)
+      .select("studentId profile readinessScore credits")
+      .sort({ readinessScore: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+      .lean();
+
+    const totalStudents = await Student.countDocuments(query);
+
+    // Get applications for these students
+    const studentIds = students.map(s => s._id);
+    const applications = await Application.find({
+      studentId: { $in: studentIds },
+    }).lean();
+
+    // Calculate metrics per student
+    const studentMetrics = students.map(student => {
+      const studentApps = applications.filter(
+        a => a.studentId.toString() === student._id.toString()
+      );
+
+      return {
+        studentId: student.studentId,
+        name: student.profile?.fullName || student.profile?.name,
+        department: student.profile?.department,
+        readinessScore: student.readinessScore || 0,
+        creditsEarned: student.credits?.earned || 0,
+        creditsRequired: student.credits?.required || 0,
+        totalApplications: studentApps.length,
+        acceptedApplications: studentApps.filter(a => a.status === "accepted").length,
+        completionRate: studentApps.filter(a => a.status === "accepted").length > 0
+          ? (studentApps.filter(a => a.status === "completed").length / studentApps.filter(a => a.status === "accepted").length) * 100
+          : 0,
+      };
+    });
+
+    // Calculate overall statistics
+    const overallStats = {
+      totalStudents,
+      averageReadinessScore: students.length > 0
+        ? students.reduce((sum, s) => sum + (s.readinessScore || 0), 0) / students.length
+        : 0,
+      averageCreditsEarned: students.length > 0
+        ? students.reduce((sum, s) => sum + (s.credits?.earned || 0), 0) / students.length
+        : 0,
+      totalApplications: applications.length,
+      overallCompletionRate: applications.filter(a => a.status === "accepted").length > 0
+        ? (applications.filter(a => a.status === "completed").length / applications.filter(a => a.status === "accepted").length) * 100
+        : 0,
+    };
+
+    res.json(apiSuccess({
+      students: studentMetrics,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: totalStudents,
+        pages: Math.ceil(totalStudents / parseInt(limit)),
+      },
+      overallStats,
+    }, "Student performance metrics"));
+  } catch (error) {
+    logger.error("Failed to get student performance metrics", {
+      error: error.message,
+    });
     next(error);
   }
 };

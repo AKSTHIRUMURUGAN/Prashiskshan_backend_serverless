@@ -1,10 +1,13 @@
 import { Router } from "express";
 import {
   getStudentDashboard,
+  getStudentProfile,
   browseInternships,
+  getInternshipDetails,
   getRecommendedInternships,
   applyToInternship,
   getMyApplications,
+  getApplicationDetails,
   withdrawApplication,
   getRecommendedModules,
   startModule,
@@ -53,7 +56,7 @@ const studentAuth = [authenticate, identifyUser, authorize("student")];
  * @swagger
  * /api/students/dashboard:
  *   get:
- *     summary: Get student dashboard
+ *     summary: Get student dashboard with mentor info
  *     tags: [Students]
  *     security:
  *       - bearerAuth: []
@@ -62,12 +65,70 @@ router.get("/dashboard", studentAuth, asyncHandler(getStudentDashboard));
 
 /**
  * @swagger
- * /api/students/internships:
+ * /api/students/profile:
  *   get:
- *     summary: Browse available internships
+ *     summary: Get profile with credits and history
  *     tags: [Students]
  *     security:
  *       - bearerAuth: []
+ */
+router.get("/profile", studentAuth, asyncHandler(getStudentProfile));
+
+/**
+ * @swagger
+ * /api/students/internships:
+ *   get:
+ *     summary: Browse available internships with AI match scores
+ *     tags: [Students]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         description: Items per page
+ *       - in: query
+ *         name: location
+ *         schema:
+ *           type: string
+ *         description: Filter by location
+ *       - in: query
+ *         name: workMode
+ *         schema:
+ *           type: string
+ *           enum: [remote, onsite, hybrid]
+ *         description: Filter by work mode
+ *       - in: query
+ *         name: skills
+ *         schema:
+ *           type: string
+ *         description: Comma-separated list of skills
+ *       - in: query
+ *         name: minStipend
+ *         schema:
+ *           type: number
+ *         description: Minimum stipend
+ *       - in: query
+ *         name: maxStipend
+ *         schema:
+ *           type: number
+ *         description: Maximum stipend
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search query
+ *       - in: query
+ *         name: includeMatchScore
+ *         schema:
+ *           type: boolean
+ *         description: Include AI match scores
  */
 router.get("/internships", studentAuth, asyncHandler(browseInternships));
 
@@ -84,15 +145,40 @@ router.get("/internships/recommended", studentAuth, asyncHandler(getRecommendedI
 
 /**
  * @swagger
- * /api/students/applications:
+ * /api/students/internships/{internshipId}:
+ *   get:
+ *     summary: Get internship details with match analysis
+ *     tags: [Students]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: internshipId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Internship ID
+ */
+router.get("/internships/:internshipId", studentAuth, asyncHandler(getInternshipDetails));
+
+/**
+ * @swagger
+ * /api/students/internships/{internshipId}/apply:
  *   post:
  *     summary: Apply to internship
  *     tags: [Students]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: internshipId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Internship ID
  */
 router.post(
-  "/applications",
+  "/internships/:internshipId/apply",
   studentAuth,
   applicationSubmit,
   handleValidationErrors,
@@ -103,12 +189,46 @@ router.post(
  * @swagger
  * /api/students/applications:
  *   get:
- *     summary: Get my applications
+ *     summary: List my applications with status
  *     tags: [Students]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *         description: Filter by status
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         description: Items per page
  */
 router.get("/applications", studentAuth, asyncHandler(getMyApplications));
+
+/**
+ * @swagger
+ * /api/students/applications/{applicationId}:
+ *   get:
+ *     summary: Get application details
+ *     tags: [Students]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: applicationId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Application ID
+ */
+router.get("/applications/:applicationId", studentAuth, asyncHandler(getApplicationDetails));
 
 /**
  * @swagger

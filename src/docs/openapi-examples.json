@@ -1,19 +1,53 @@
 {
   "/api/admins/dashboard": {},
   "/api/admins/companies/pending": {},
+  "/api/admins/companies": {},
   "/api/admins/companies/{companyId}": {},
   "/api/admins/companies/{companyId}/verify": {},
   "/api/admins/companies/{companyId}/reject": {},
+  "/api/admins/companies/:companyId/block": {},
   "/api/admins/companies/{companyId}/suspend": {},
   "/api/admins/students/import": {},
   "/api/admins/students/import/{jobId}": {},
   "/api/admins/mentors/assign": {},
-  "/api/admins/credits/process": {},
+  "/api/admins/credit-requests/pending": {},
+  "/api/admins/credit-requests/{requestId}": {},
+  "/api/admins/credit-requests/{requestId}/review": {},
+  "/api/admins/credit-requests/{requestId}/resolve": {},
+  "/api/admins/credit-requests/analytics": {},
+  "/api/admins/credit-requests/export": {},
+  "/api/admins/credit-requests/bottlenecks": {},
+  "/api/admins/credit-requests/overdue": {},
+  "/api/admins/credit-requests/reminders/stats": {},
+  "/api/admins/credit-requests/reminders/send": {},
+  "/api/admins/credit-requests/reminders/schedule": {},
   "/api/admins/reports/system": {},
   "/api/admins/analytics/system": {},
   "/api/admins/analytics/college": {},
   "/api/admins/system/health": {},
   "/api/admins/ai/usage": {},
+  "/api/admins/internships/{internshipId}/approve": {},
+  "/api/admins/internships/{internshipId}/reject": {},
+  "/api/admins/internships": {},
+  "/api/admins/internships/pending": {},
+  "/api/admins/internships/{id}/approve": {},
+  "/api/admins/internships/{id}/reject": {},
+  "/api/admins/internships/{id}": {},
+  "/api/admins/analytics": {},
+  "/api/admins/analytics/companies": {},
+  "/api/admins/analytics/departments": {},
+  "/api/admins/analytics/mentors": {},
+  "/api/admins/analytics/students": {},
+  "/api/admins/reappeals": {},
+  "/api/admins/reappeals/{companyId}/approve": {},
+  "/api/admins/reappeals/{companyId}/reject": {},
+  "/api/applications/{id}/status": {
+    "patch": {
+      "status": "string",
+      "feedback": "string",
+      "rejectionReason": "string"
+    }
+  },
   "/api/auth/students/register": {},
   "/api/auth/companies/register": {},
   "/api/auth/mentors/register": {},
@@ -26,20 +60,82 @@
   "/api/auth/profile/image": {},
   "/api/auth/profile/resume": {},
   "/api/auth/account": {},
+  "/api/companies/applications": {},
   "/api/companies/dashboard": {},
   "/api/companies/profile": {},
   "/api/companies/internships": {},
   "/api/companies/internships/{internshipId}": {},
   "/api/companies/internships/{internshipId}/complete": {},
   "/api/companies/internships/{internshipId}/applicants": {},
+  "/api/companies/internships/{internshipId}/metrics": {},
   "/api/companies/applications/review": {},
   "/api/companies/applications/shortlist": {},
   "/api/companies/applications/reject": {},
+  "/api/companies/applications/approve": {
+    "post": {
+      "applicationId": "string",
+      "feedback": "string",
+      "nextSteps": "string"
+    }
+  },
+  "/api/companies/applications/reject-single": {
+    "post": {
+      "applicationId": "string",
+      "reason": "string",
+      "feedback": "string"
+    }
+  },
+  "/api/companies/applications/{applicationId}": {},
+  "/api/companies/interns": {},
   "/api/companies/interns/progress": {},
+  "/api/companies/interns/{studentId}/logbooks": {},
+  "/api/companies/interns/{applicationId}/complete": {},
   "/api/companies/logbooks/{logbookId}/feedback": {},
   "/api/companies/events": {},
   "/api/companies/challenges": {},
+  "/api/companies/analytics": {},
+  "/api/companies/analytics/export": {},
+  "/api/companies/re-appeal": {},
+  "/api/companies/reappeal": {
+    "post": {
+      "message": "string",
+      "attachment": "string"
+    }
+  },
+  "/api/companies/reappeal/status": {},
+  "/api/companies/completions/:completionId/mark-complete": {
+    "put": {
+      "evaluationScore": 1,
+      "evaluationComments": "string"
+    }
+  },
+  "/api/companies/completions/completed": {},
   "/api/health": {},
+  "/api/internships/browse": {},
+  "/api/interviews/start": {},
+  "/api/interviews/{sessionId}/answer": {},
+  "/api/interviews/{sessionId}": {},
+  "/api/logbooks": {
+    "post": {
+      "internshipId": "string",
+      "weekNumber": 1,
+      "startDate": "string",
+      "endDate": "string",
+      "hoursWorked": 1,
+      "activities": "string",
+      "tasksCompleted": [
+        "string"
+      ],
+      "skillsUsed": [
+        "string"
+      ],
+      "challenges": "string",
+      "learnings": "string",
+      "attachments": [
+        "string"
+      ]
+    }
+  },
   "/api/mentors/dashboard": {},
   "/api/mentors/applications/pending": {},
   "/api/mentors/applications/{applicationId}": {},
@@ -53,9 +149,51 @@
   "/api/mentors/department/performance": {},
   "/api/mentors/interventions": {},
   "/api/mentors/students/{studentId}/progress": {},
+  "/api/mentors/students": {},
+  "/api/mentor/internships/pending": {},
+  "/api/mentor/internships/{internshipId}": {},
+  "/api/mentor/internships/{internshipId}/approve": {
+    "post": {
+      "comments": "string"
+    }
+  },
+  "/api/mentor/internships/{internshipId}/reject": {
+    "post": {
+      "reasons": "string"
+    }
+  },
+  "/api/mentor/students": {},
+  "/api/mentor/students/{studentId}": {},
+  "/api/mentor/students/{studentId}/applications": {},
+  "/api/mentor/analytics": {},
+  "/api/mentor/analytics/department": {},
+  "/api/mentors/credits/pending": {},
+  "/api/mentors/credits/{requestId}/decide": {},
+  "/api/mentors/{mentorId}/credit-requests/pending": {},
+  "/api/mentors/{mentorId}/credit-requests/{requestId}": {},
+  "/api/mentors/{mentorId}/credit-requests/{requestId}/review": {
+    "post": {
+      "decision": "approved",
+      "feedback": "string",
+      "qualityCriteria": {
+        "logbookComplete": true,
+        "reportQuality": true,
+        "learningOutcomes": true,
+        "companyEvaluation": true
+      }
+    }
+  },
+  "/api/mentors/{mentorId}/credit-requests/history": {},
+  "/api/mentors/{mentorId}/credit-requests/analytics": {},
+  "/api/notifications": {},
+  "/api/notifications/{id}/read": {},
+  "/api/notifications/read-all": {},
   "/api/students/dashboard": {},
+  "/api/students/profile": {},
   "/api/students/internships": {},
   "/api/students/internships/recommended": {},
+  "/api/students/internships/{internshipId}": {},
+  "/api/students/internships/{internshipId}/apply": {},
   "/api/students/applications": {},
   "/api/students/applications/{applicationId}": {},
   "/api/students/modules/recommended": {},
@@ -69,6 +207,14 @@
   "/api/students/credits": {},
   "/api/students/reports/nep": {},
   "/api/students/chatbot": {},
+  "/api/students/internships/completed": {},
+  "/api/students/:studentId/credit-requests": {},
+  "/api/students/:studentId/credit-requests/:requestId": {},
+  "/api/students/:studentId/credit-requests/:requestId/resubmit": {},
+  "/api/students/:studentId/credit-requests/:requestId/status": {},
+  "/api/students/:studentId/credit-requests/:requestId/reminder": {},
+  "/api/students/:studentId/credits/history": {},
+  "/api/students/:studentId/credits/certificate/:requestId": {},
   "/api/tests/email": {
     "post": {
       "to": "test@example.com",
@@ -101,5 +247,13 @@
       "model": "flash"
     }
   },
-  "/api/tests/status": {}
+  "/api/tests/status": {},
+  "/api/upload": {
+    "post": {
+      "file": "string"
+    },
+    "delete": {
+      "url": "string"
+    }
+  }
 }

@@ -161,6 +161,12 @@ export const createTestMentor = async (overrides = {}) => {
       ...overrides.profile,
     },
     ...overrides,
+    // Ensure profile is not overwritten by top-level overrides
+    profile: {
+      name: "Test Mentor",
+      department: "Computer Science",
+      ...overrides.profile,
+    },
   });
   return { mentor, firebaseUser };
 };

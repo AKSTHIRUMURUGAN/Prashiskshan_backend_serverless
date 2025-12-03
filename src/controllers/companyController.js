@@ -8,6 +8,9 @@ import InternshipCompletion from "../models/InternshipCompletion.js";
 import { apiSuccess } from "../utils/apiResponse.js";
 import { createHttpError, resolveUserFromRequest } from "./helpers/context.js";
 import { logger } from "../utils/logger.js";
+import { internshipService } from "../services/internshipService.js";
+import { applicationService } from "../services/applicationService.js";
+import { internshipAnalyticsService } from "../services/internshipAnalyticsService.js";
 
 /**
  * Extract storage key from R2 public URL
@@ -105,92 +108,227 @@ export const updateCompanyProfile = async (req, res, next) => {
   }
 };
 
+/**
+ * Create internship with AI tagging
+ * Requirements: 1.1, 1.2, 1.4
+ * POST /api/company/internships
+ */
 export const createInternship = async (req, res, next) => {
   try {
     const company = await ensureCompanyContext(req);
-    const payload = req.body;
-    if (!payload.title || !payload.description || !payload.department || !payload.requiredSkills) {
-      throw createHttpError(400, "Missing required fields");
-    }
+    
+    // Use internship service to create internship with validation and AI tagging
+    const internship = await internshipService.createInternship(
+      company._id,
+      req.body,
+      {
+        postedBy: company.companyId,
+        enableAITagging: true,
+      }
+    );
 
-    const internship = await Internship.create({
-      ...payload,
-      internshipId: `INTERN-${Date.now()}`,
-      companyId: company._id,
-      status: "pending_approval",
-      postedBy: company.companyId,
-      postedAt: new Date(),
-    });
-
-    res.status(201).json(apiSuccess(internship, "Internship created"));
+    res.status(201).json(apiSuccess(internship, "Internship created successfully"));
   } catch (error) {
     next(error);
   }
 };
 
+/**
+ * Update internship with status reset logic
+ * Requirements: 1.5
+ * PUT /api/company/internships/:id
+ */
 export const updateInternship = async (req, res, next) => {
   try {
     const company = await ensureCompanyContext(req);
     const { internshipId } = req.params;
-    const internship = await ensureInternshipOwnership(company._id, internshipId);
+    
+    // Verify ownership
+    await ensureInternshipOwnership(company._id, internshipId);
 
-    Object.assign(internship, req.body);
-    internship.status = "pending_approval";
-    await internship.save();
+    // Use internship service to update with status reset logic
+    const internship = await internshipService.updateInternship(
+      internshipId,
+      req.body,
+      {
+        actor: company.companyId,
+        actorRole: "company",
+        enableAITagging: true,
+      }
+    );
 
-    res.json(apiSuccess(internship, "Internship updated and pending approval"));
+    res.json(apiSuccess(internship, "Internship updated successfully"));
   } catch (error) {
     next(error);
   }
 };
 
+/**
+ * Cancel internship
+ * Requirements: 1.1
+ * DELETE /api/company/internships/:id
+ */
 export const deleteInternship = async (req, res, next) => {
   try {
     const company = await ensureCompanyContext(req);
     const { internshipId } = req.params;
+    
+    // Verify ownership
     const internship = await ensureInternshipOwnership(company._id, internshipId);
+    
+    // Update status to cancelled
     internship.status = "cancelled";
     internship.closedAt = new Date();
+    
+    // Add audit trail entry
+    internship.auditTrail.push({
+      timestamp: new Date(),
+      actor: company.companyId,
+      actorRole: "company",
+      action: "cancel_internship",
+      fromStatus: internship.status,
+      toStatus: "cancelled",
+      reason: "Internship cancelled by company",
+    });
+    
     await internship.save();
+    
     res.status(204).send();
   } catch (error) {
     next(error);
   }
 };
 
+/**
+ * List company internships with filters
+ * Requirements: 1.1, 1.4
+ * GET /api/company/internships
+ */
 export const getCompanyInternships = async (req, res, next) => {
   try {
     const company = await ensureCompanyContext(req);
-    const query = { companyId: company._id };
-    if (req.query.status) query.status = req.query.status;
-    const internships = await Internship.find(query).sort({ createdAt: -1 }).lean();
-    res.json(apiSuccess(internships, "Company internships"));
+    
+    // Build filters from query parameters
+    const filters = {
+      companyId: company._id,
+      page: req.query.page,
+      limit: req.query.limit,
+      sortBy: req.query.sortBy,
+      sortOrder: req.query.sortOrder,
+      search: req.query.search,
+      startDateFrom: req.query.startDateFrom,
+      startDateTo: req.query.startDateTo,
+    };
+    
+    // Get internships by status if provided, otherwise get all
+    let result;
+    if (req.query.status) {
+      result = await internshipService.getInternshipsByStatus(req.query.status, filters);
+    } else {
+      // Get all internships for this company
+      const query = { companyId: company._id };
+      
+      if (filters.search) {
+        query.$text = { $search: filters.search };
+      }
+      
+      if (filters.startDateFrom) {
+        query.startDate = { ...query.startDate, $gte: new Date(filters.startDateFrom) };
+      }
+      
+      if (filters.startDateTo) {
+        query.startDate = { ...query.startDate, $lte: new Date(filters.startDateTo) };
+      }
+      
+      const page = parseInt(filters.page) || 1;
+      const limit = parseInt(filters.limit) || 20;
+      const skip = (page - 1) * limit;
+      
+      const sortField = filters.sortBy || "createdAt";
+      const sortOrder = filters.sortOrder === "asc" ? 1 : -1;
+      const sort = { [sortField]: sortOrder };
+      
+      const [internships, total] = await Promise.all([
+        Internship.find(query)
+          .sort(sort)
+          .skip(skip)
+          .limit(limit)
+          .lean(),
+        Internship.countDocuments(query),
+      ]);
+      
+      result = {
+        internships,
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit),
+        },
+      };
+    }
+    
+    res.json(apiSuccess(result, "Company internships retrieved successfully"));
   } catch (error) {
     next(error);
   }
 };
 
+/**
+ * Get internship details
+ * Requirements: 1.1
+ * GET /api/company/internships/:id
+ */
 export const getInternshipById = async (req, res, next) => {
   try {
     const company = await ensureCompanyContext(req);
     const { internshipId } = req.params;
+    
+    // Verify ownership and get internship
     const internship = await ensureInternshipOwnership(company._id, internshipId);
-    res.json(apiSuccess(internship, "Internship details"));
+    
+    // Populate company details
+    await internship.populate("companyId", "companyName industry logo");
+    
+    res.json(apiSuccess(internship, "Internship details retrieved successfully"));
   } catch (error) {
     next(error);
   }
 };
 
+/**
+ * List applicants with filters
+ * Requirements: 5.2, 5.3
+ * GET /api/company/internships/:id/applicants
+ */
 export const getApplicants = async (req, res, next) => {
   try {
     const company = await ensureCompanyContext(req);
     const { internshipId } = req.params;
+    
+    // Verify ownership
     const internship = await ensureInternshipOwnership(company._id, internshipId);
-    const status = req.query.status;
-    const query = { internshipId: internship._id };
-    if (status) query.status = status;
-    const applications = await Application.find(query).populate("studentId").sort({ appliedAt: -1 }).lean();
-    res.json(apiSuccess(applications, "Internship applicants"));
+    
+    // Build filters from query parameters
+    const filters = {
+      status: req.query.status,
+      companyFeedbackStatus: req.query.companyFeedbackStatus,
+      search: req.query.search,
+      appliedFrom: req.query.appliedFrom,
+      appliedTo: req.query.appliedTo,
+      page: req.query.page,
+      limit: req.query.limit,
+      sortBy: req.query.sortBy,
+      sortOrder: req.query.sortOrder,
+    };
+    
+    // Use application service to get applications with filters
+    const result = await applicationService.getApplicationsByInternship(
+      internship._id.toString(),
+      filters
+    );
+    
+    res.json(apiSuccess(result, "Internship applicants retrieved successfully"));
   } catch (error) {
     next(error);
   }
@@ -272,6 +410,99 @@ export const rejectCandidates = async (req, res, next) => {
       },
     );
     res.json(apiSuccess({ modified: update.modifiedCount }, "Candidates rejected"));
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Approve application
+ * Requirements: 5.2
+ * POST /api/company/applications/approve
+ */
+export const approveApplication = async (req, res, next) => {
+  try {
+    const company = await ensureCompanyContext(req);
+    const { applicationId, feedback, nextSteps } = req.body;
+    
+    if (!applicationId) {
+      throw createHttpError(400, "applicationId is required");
+    }
+    
+    // Use application service to approve with slot decrement
+    const application = await applicationService.companyApprove(
+      applicationId,
+      company._id,
+      {
+        feedback,
+        nextSteps,
+        reviewedBy: company.companyId,
+      }
+    );
+    
+    res.json(apiSuccess(application, "Application approved successfully"));
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Reject application
+ * Requirements: 5.3
+ * POST /api/company/applications/reject
+ */
+export const rejectApplication = async (req, res, next) => {
+  try {
+    const company = await ensureCompanyContext(req);
+    const { applicationId, reason, feedback } = req.body;
+    
+    if (!applicationId) {
+      throw createHttpError(400, "applicationId is required");
+    }
+    
+    // Use application service to reject
+    const application = await applicationService.companyReject(
+      applicationId,
+      company._id,
+      {
+        reason,
+        feedback,
+        reviewedBy: company.companyId,
+      }
+    );
+    
+    res.json(apiSuccess(application, "Application rejected successfully"));
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Get application details
+ * Requirements: 5.2, 5.3
+ * GET /api/company/applications/:id
+ */
+export const getApplicationDetails = async (req, res, next) => {
+  try {
+    const company = await ensureCompanyContext(req);
+    const { applicationId } = req.params;
+    
+    // Get application and verify ownership
+    const application = await Application.findOne({ applicationId })
+      .populate("studentId", "studentId profile department readinessScore")
+      .populate("internshipId", "internshipId title department")
+      .lean();
+    
+    if (!application) {
+      throw createHttpError(404, "Application not found");
+    }
+    
+    // Verify company ownership
+    if (application.companyId.toString() !== company._id.toString()) {
+      throw createHttpError(403, "Unauthorized: This application does not belong to your company");
+    }
+    
+    res.json(apiSuccess(application, "Application details retrieved successfully"));
   } catch (error) {
     next(error);
   }
@@ -537,6 +768,100 @@ export const completeInternship = async (req, res, next) => {
     next(error);
   }
 };
+/**
+ * Get company analytics with date range
+ * Requirements: 9.1, 9.2, 9.3, 9.4
+ * GET /api/company/analytics
+ */
+export const getCompanyAnalytics = async (req, res, next) => {
+  try {
+    const company = await ensureCompanyContext(req);
+    
+    // Build options from query parameters
+    const options = {
+      dateFrom: req.query.dateFrom,
+      dateTo: req.query.dateTo,
+    };
+    
+    // Use analytics service to get company analytics
+    const analytics = await internshipAnalyticsService.getCompanyAnalytics(
+      company._id,
+      options
+    );
+    
+    res.json(apiSuccess(analytics, "Company analytics retrieved successfully"));
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Export analytics report
+ * Requirements: 9.5
+ * GET /api/company/analytics/export
+ */
+export const exportCompanyAnalytics = async (req, res, next) => {
+  try {
+    const company = await ensureCompanyContext(req);
+    
+    // Get format from query (default to CSV)
+    const format = req.query.format || "csv";
+    
+    if (!["csv", "pdf"].includes(format)) {
+      throw createHttpError(400, "Invalid format. Must be 'csv' or 'pdf'");
+    }
+    
+    // Build options from query parameters
+    const options = {
+      dateFrom: req.query.dateFrom,
+      dateTo: req.query.dateTo,
+    };
+    
+    // Use analytics service to export analytics
+    const result = await internshipAnalyticsService.exportAnalytics(
+      "company",
+      company._id,
+      format,
+      options
+    );
+    
+    // Set appropriate headers based on format
+    if (format === "csv") {
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename="${result.filename}"`);
+      res.send(result.data);
+    } else if (format === "pdf") {
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${result.filename}"`);
+      res.send(result.data);
+    }
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Get internship-specific metrics
+ * Requirements: 9.1, 9.2
+ * GET /api/company/internships/:id/metrics
+ */
+export const getInternshipMetrics = async (req, res, next) => {
+  try {
+    const company = await ensureCompanyContext(req);
+    const { internshipId } = req.params;
+    
+    // Verify ownership
+    await ensureInternshipOwnership(company._id, internshipId);
+    
+    // Use application service to get metrics
+    const metrics = await applicationService.getApplicationMetrics(internshipId);
+    
+    res.json(apiSuccess(metrics, "Internship metrics retrieved successfully"));
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const reAppeal = async (req, res, next) => {
   try {
     const context = await resolveUserFromRequest(req);

@@ -154,6 +154,7 @@ describe("CreditService", () => {
         totalHours: 320,
         creditsEarned: 2,
         completionDate: new Date(),
+        status: "completed",
         evaluation: {
           mentorScore: 85,
           companyScore: 90,

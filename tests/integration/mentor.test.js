@@ -254,3 +254,305 @@ describe("Mentor Routes - CRUD Operations", () => {
     });
   });
 });
+
+describe("Mentor Internship Approval Endpoints", () => {
+  let mentor, firebaseUser, authToken, company, adminApprovedInternship;
+
+  beforeEach(async () => {
+    const mentorData = await createTestMentor({
+      profile: { department: "Computer Science" },
+    });
+    mentor = mentorData.mentor;
+    firebaseUser = mentorData.firebaseUser;
+    authToken = await getAuthToken(firebaseUser);
+
+    const companyData = await createTestCompany();
+    company = companyData.company;
+
+    // Create an admin-approved internship for mentor review
+    adminApprovedInternship = await Internship.create({
+      internshipId: `INTERN-ADMIN-${Date.now()}`,
+      companyId: company._id,
+      title: "Backend Developer Intern",
+      description: "Work on backend systems",
+      department: "Computer Science",
+      requiredSkills: ["Node.js", "MongoDB"],
+      duration: "6 months",
+      startDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      applicationDeadline: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
+      slots: 3,
+      slotsRemaining: 3,
+      status: "admin_approved",
+      postedBy: company.companyId,
+      postedAt: new Date(),
+      adminReview: {
+        reviewedBy: "ADMIN-001",
+        reviewedAt: new Date(),
+        decision: "approved",
+        comments: "Looks good",
+      },
+    });
+  });
+
+  describe("GET /mentor/internships/pending - List Pending Internships", () => {
+    it("should get pending internships for mentor approval", async () => {
+      const response = await request(app)
+        .get("/mentors/internships/pending")
+        .set("Authorization", `Bearer ${authToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(Array.isArray(response.body.data.internships)).toBe(true);
+      expect(response.body.data.pagination).toBeDefined();
+    });
+
+    it("should support pagination", async () => {
+      const response = await request(app)
+        .get("/mentors/internships/pending?page=1&limit=10")
+        .set("Authorization", `Bearer ${authToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.pagination.page).toBe(1);
+      expect(response.body.data.pagination.limit).toBe(10);
+    });
+  });
+
+  describe("GET /mentor/internships/:internshipId - Get Internship Details", () => {
+    it("should get internship details", async () => {
+      const response = await request(app)
+        .get(`/mentors/internships/${adminApprovedInternship.internshipId}`)
+        .set("Authorization", `Bearer ${authToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.internshipId).toBe(adminApprovedInternship.internshipId);
+    });
+
+    it("should return 404 for non-existent internship", async () => {
+      const response = await request(app)
+        .get("/mentors/internships/NONEXISTENT")
+        .set("Authorization", `Bearer ${authToken}`);
+
+      expect(response.status).toBe(404);
+    });
+  });
+
+  describe("POST /mentor/internships/:internshipId/approve - Approve Internship", () => {
+    it("should approve internship for department", async () => {
+      const response = await request(app)
+        .post(`/mentors/internships/${adminApprovedInternship.internshipId}/approve`)
+        .set("Authorization", `Bearer ${authToken}`)
+        .send({
+          comments: "Excellent opportunity for our students",
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.status).toBe("open_for_applications");
+    });
+  });
+
+  describe("POST /mentor/internships/:internshipId/reject - Reject Internship", () => {
+    it("should reject internship with reasons", async () => {
+      const response = await request(app)
+        .post(`/mentors/internships/${adminApprovedInternship.internshipId}/reject`)
+        .set("Authorization", `Bearer ${authToken}`)
+        .send({
+          reasons: "Not aligned with our curriculum",
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.status).toBe("mentor_rejected");
+    });
+
+    it("should require rejection reasons", async () => {
+      const response = await request(app)
+        .post(`/mentors/internships/${adminApprovedInternship.internshipId}/reject`)
+        .set("Authorization", `Bearer ${authToken}`)
+        .send({});
+
+      expect(response.status).toBe(400);
+    });
+  });
+});
+
+describe("Mentor Student Management Endpoints", () => {
+  let mentor, firebaseUser, authToken, student1, student2;
+
+  beforeEach(async () => {
+    const mentorData = await createTestMentor({
+      profile: { department: "Computer Science" },
+    });
+    mentor = mentorData.mentor;
+    firebaseUser = mentorData.firebaseUser;
+    authToken = await getAuthToken(firebaseUser);
+
+    const student1Data = await createTestStudent({
+      profile: { 
+        department: "Computer Science",
+        name: "Alice Johnson",
+      },
+      readinessScore: 85,
+      credits: { earned: 15 },
+    });
+    student1 = student1Data.student;
+
+    const student2Data = await createTestStudent({
+      profile: { 
+        department: "Computer Science",
+        name: "Bob Smith",
+      },
+      readinessScore: 45,
+      credits: { earned: 5 },
+    });
+    student2 = student2Data.student;
+  });
+
+  describe("GET /mentor/students/list - List Assigned Students", () => {
+    it("should get assigned students", async () => {
+      const response = await request(app)
+        .get("/mentors/students/list")
+        .set("Authorization", `Bearer ${authToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(Array.isArray(response.body.data.students)).toBe(true);
+      expect(response.body.data.pagination).toBeDefined();
+    });
+
+    it("should filter by performance level", async () => {
+      const response = await request(app)
+        .get("/mentors/students/list?performanceLevel=high")
+        .set("Authorization", `Bearer ${authToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+    });
+
+    it("should filter by credit completion", async () => {
+      const response = await request(app)
+        .get("/mentors/students/list?creditCompletion=in_progress")
+        .set("Authorization", `Bearer ${authToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+    });
+
+    it("should support search", async () => {
+      const response = await request(app)
+        .get("/mentors/students/list?search=Alice")
+        .set("Authorization", `Bearer ${authToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+    });
+  });
+
+  describe("GET /mentor/students/:studentId/details - Get Student Details", () => {
+    it("should get student details with internship history", async () => {
+      const response = await request(app)
+        .get(`/mentors/students/${student1.studentId}/details`)
+        .set("Authorization", `Bearer ${authToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.student).toBeDefined();
+      expect(response.body.data.internshipHistory).toBeDefined();
+    });
+
+    it("should return 404 for non-existent student", async () => {
+      const response = await request(app)
+        .get("/mentors/students/NONEXISTENT/details")
+        .set("Authorization", `Bearer ${authToken}`);
+
+      expect(response.status).toBe(404);
+    });
+  });
+
+  describe("GET /mentor/students/:studentId/applications - Get Student Applications", () => {
+    it("should get student applications", async () => {
+      const response = await request(app)
+        .get(`/mentors/students/${student1.studentId}/applications`)
+        .set("Authorization", `Bearer ${authToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(Array.isArray(response.body.data.applications)).toBe(true);
+      expect(response.body.data.pagination).toBeDefined();
+    });
+
+    it("should filter by status", async () => {
+      const response = await request(app)
+        .get(`/mentors/students/${student1.studentId}/applications?status=pending`)
+        .set("Authorization", `Bearer ${authToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+    });
+  });
+});
+
+describe("Mentor Analytics Endpoints", () => {
+  let mentor, firebaseUser, authToken;
+
+  beforeEach(async () => {
+    const mentorData = await createTestMentor({
+      profile: { department: "Computer Science" },
+    });
+    mentor = mentorData.mentor;
+    firebaseUser = mentorData.firebaseUser;
+    authToken = await getAuthToken(firebaseUser);
+  });
+
+  describe("GET /mentor/analytics - Get Mentor Analytics", () => {
+    it("should get mentor-specific analytics", async () => {
+      const response = await request(app)
+        .get("/mentors/analytics")
+        .set("Authorization", `Bearer ${authToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.mentorId).toBe(mentor.mentorId);
+      expect(response.body.data.approvals).toBeDefined();
+      expect(response.body.data.students).toBeDefined();
+    });
+
+    it("should support date range filtering", async () => {
+      const dateFrom = "2024-01-01";
+      const dateTo = "2024-12-31";
+      const response = await request(app)
+        .get(`/mentors/analytics?dateFrom=${dateFrom}&dateTo=${dateTo}`)
+        .set("Authorization", `Bearer ${authToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+    });
+  });
+
+  describe("GET /mentor/analytics/department - Get Department Analytics", () => {
+    it("should get department analytics", async () => {
+      const response = await request(app)
+        .get("/mentors/analytics/department")
+        .set("Authorization", `Bearer ${authToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.department).toBe("Computer Science");
+      expect(response.body.data.internships).toBeDefined();
+      expect(response.body.data.applications).toBeDefined();
+      expect(response.body.data.students).toBeDefined();
+    });
+
+    it("should support date range filtering", async () => {
+      const dateFrom = "2024-01-01";
+      const dateTo = "2024-12-31";
+      const response = await request(app)
+        .get(`/mentors/analytics/department?dateFrom=${dateFrom}&dateTo=${dateTo}`)
+        .set("Authorization", `Bearer ${authToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+    });
+  });
+});

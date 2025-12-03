@@ -4,6 +4,8 @@ import Student from "../models/Student.js";
 import Application from "../models/Application.js";
 import Logbook from "../models/Logbook.js";
 import CreditRequest from "../models/CreditRequest.js";
+import Internship from "../models/Internship.js";
+import InternshipCompletion from "../models/InternshipCompletion.js";
 import { skillGapAnalysisService } from "../services/skillGapAnalysisService.js";
 import { apiSuccess } from "../utils/apiResponse.js";
 import { createHttpError, resolveUserFromRequest } from "./helpers/context.js";
@@ -84,10 +86,9 @@ export const getApplicationDetails = async (req, res, next) => {
   try {
     const mentor = await ensureMentorContext(req);
     const { applicationId } = req.params;
-    if (!mongoose.Types.ObjectId.isValid(applicationId)) throw createHttpError(400, "Invalid applicationId");
 
     const application = await Application.findOne({
-      _id: applicationId,
+      applicationId: applicationId,
       department: mentor.profile.department,
     })
       .populate("studentId")
@@ -109,7 +110,7 @@ export const approveApplication = async (req, res, next) => {
     const { comments, recommendedPreparation = [] } = req.body;
 
     const application = await Application.findOne({
-      _id: applicationId,
+      applicationId: applicationId,
       department: mentor.profile.department,
     });
     if (!application) throw createHttpError(404, "Application not found");
@@ -144,7 +145,7 @@ export const rejectApplication = async (req, res, next) => {
     const { comments } = req.body;
 
     const application = await Application.findOne({
-      _id: applicationId,
+      applicationId: applicationId,
       department: mentor.profile.department,
     });
     if (!application) throw createHttpError(404, "Application not found");
@@ -672,3 +673,580 @@ export const getMentorCreditAnalytics = async (req, res, next) => {
 // Backward compatibility aliases
 export const getPendingCreditRequests = getMentorPendingCreditRequests;
 export const approveCreditRequest = submitMentorCreditReview;
+
+/**
+ * GET /api/mentor/internships/pending
+ * List pending internships for mentor approval (admin_approved status)
+ * Requirements: 3.1
+ */
+/**
+ * GET /api/mentor/internships
+ * Get all internships with filtering for mentor's department
+ */
+export const getMentorInternships = async (req, res, next) => {
+  try {
+    const mentor = await ensureMentorContext(req);
+    const mentorDepartment = mentor.profile.department;
+    
+    const { 
+      status, 
+      search, 
+      department, 
+      page = 1, 
+      limit = 10,
+      sortBy = "postedAt",
+      sortOrder = "desc"
+    } = req.query;
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Build query - filter by mentor's department unless they want all
+    const query = {};
+    
+    // If department filter is provided, use it; otherwise use mentor's department
+    if (department) {
+      // If "All" is selected, show internships for mentor's department OR "All" department
+      if (department === 'All') {
+        query.$or = [
+          { department: mentorDepartment },
+          { department: 'All' }
+        ];
+      } else {
+        query.department = department;
+      }
+    } else {
+      // Show internships for mentor's department OR "All" department
+      query.$or = [
+        { department: mentorDepartment },
+        { department: 'All' }
+      ];
+    }
+
+    // Status filter with special handling for admin_approved
+    if (status) {
+      if (status === 'admin_approved') {
+        // For admin_approved, exclude internships already approved by this mentor
+        query.status = status;
+        query['departmentApprovals.department'] = { $ne: mentorDepartment };
+      } else if (status === 'open_for_applications') {
+        // For open_for_applications, show internships approved by this mentor
+        query.$and = [
+          {
+            $or: [
+              // Specific department internships that are open
+              { department: mentorDepartment, status: 'open_for_applications' },
+              // "All" department internships approved by this mentor
+              { department: 'All', 'departmentApprovals.department': mentorDepartment }
+            ]
+          }
+        ];
+      } else {
+        query.status = status;
+      }
+    }
+
+    // Search filter
+    if (search) {
+      if (!query.$and) {
+        query.$and = [];
+      }
+      query.$and.push({
+        $or: [
+          { title: { $regex: search, $options: 'i' } },
+          { description: { $regex: search, $options: 'i' } },
+        ]
+      });
+    }
+
+    const sortOptions = {};
+    sortOptions[sortBy] = sortOrder === "asc" ? 1 : -1;
+
+    const [internships, total] = await Promise.all([
+      Internship.find(query)
+        .populate("companyId", "companyId companyName email")
+        .sort(sortOptions)
+        .skip(skip)
+        .limit(parseInt(limit))
+        .lean(),
+      Internship.countDocuments(query),
+    ]);
+
+    // Flatten company data
+    const formattedInternships = internships.map(internship => ({
+      ...internship,
+      companyName: internship.companyId?.companyName || 'Unknown Company',
+    }));
+
+    res.json(
+      apiSuccess(
+        {
+          internships: formattedInternships,
+          pagination: {
+            total,
+            page: parseInt(page),
+            limit: parseInt(limit),
+            pages: Math.ceil(total / parseInt(limit)),
+          },
+        },
+        "Internships retrieved successfully"
+      )
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getPendingInternships = async (req, res, next) => {
+  try {
+    const mentor = await ensureMentorContext(req);
+    const department = mentor.profile.department;
+    const { page = 1, limit = 20, sortBy = "postedAt", sortOrder = "desc" } = req.query;
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Query for internships that are admin approved and awaiting mentor verification
+    // Include internships for mentor's department OR "All" department
+    const query = {
+      status: "admin_approved",
+      $or: [
+        { department: department },
+        { department: 'All' }
+      ]
+    };
+
+    const sortOptions = {};
+    sortOptions[sortBy] = sortOrder === "asc" ? 1 : -1;
+
+    const [internships, total] = await Promise.all([
+      Internship.find(query)
+        .populate("companyId", "companyId companyName email profile")
+        .sort(sortOptions)
+        .skip(skip)
+        .limit(parseInt(limit))
+        .lean(),
+      Internship.countDocuments(query),
+    ]);
+
+    res.json(
+      apiSuccess(
+        {
+          internships,
+          pagination: {
+            total,
+            page: parseInt(page),
+            limit: parseInt(limit),
+            pages: Math.ceil(total / parseInt(limit)),
+          },
+        },
+        "Pending internships retrieved successfully"
+      )
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * GET /api/mentor/internships/:internshipId
+ * Get internship details for mentor review
+ * Requirements: 3.1
+ */
+export const getInternshipDetails = async (req, res, next) => {
+  try {
+    const mentor = await ensureMentorContext(req);
+    const { internshipId } = req.params;
+
+    const internship = await Internship.findOne({ internshipId })
+      .populate("companyId", "companyId companyName email profile verificationStatus")
+      .lean();
+
+    if (!internship) {
+      throw createHttpError(404, "Internship not found");
+    }
+
+    // Verify this internship is for the mentor's department or "All" departments
+    if (internship.department !== mentor.profile.department && internship.department !== 'All') {
+      throw createHttpError(403, "You can only view internships for your department");
+    }
+
+    res.json(apiSuccess(internship, "Internship details retrieved successfully"));
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * POST /api/mentor/internships/:internshipId/approve
+ * Approve internship for department
+ * Requirements: 3.2, 3.4
+ */
+export const approveInternship = async (req, res, next) => {
+  try {
+    const mentor = await ensureMentorContext(req);
+    const { internshipId } = req.params;
+    const { comments = "" } = req.body;
+
+    // Use the approval workflow service
+    const { approvalWorkflowService } = await import("../services/approvalWorkflowService.js");
+    
+    const updatedInternship = await approvalWorkflowService.mentorApprove(
+      internshipId,
+      mentor._id,
+      comments
+    );
+
+    res.json(
+      apiSuccess(
+        updatedInternship,
+        "Internship approved successfully and is now visible to students"
+      )
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * POST /api/mentor/internships/:internshipId/reject
+ * Reject internship with reasons
+ * Requirements: 3.3
+ */
+export const rejectInternship = async (req, res, next) => {
+  try {
+    const mentor = await ensureMentorContext(req);
+    const { internshipId } = req.params;
+    const { reasons } = req.body;
+
+    if (!reasons || reasons.trim().length === 0) {
+      throw createHttpError(400, "Rejection reason is required");
+    }
+
+    // Use the approval workflow service
+    const { approvalWorkflowService } = await import("../services/approvalWorkflowService.js");
+    
+    const updatedInternship = await approvalWorkflowService.mentorReject(
+      internshipId,
+      mentor._id,
+      reasons
+    );
+
+    res.json(
+      apiSuccess(
+        updatedInternship,
+        "Internship rejected successfully"
+      )
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * GET /api/mentor/students
+ * List assigned students with filters
+ * Requirements: 8.2, 8.5
+ */
+export const getAssignedStudents = async (req, res, next) => {
+  try {
+    const mentor = await ensureMentorContext(req);
+    const department = mentor.profile.department;
+    const { 
+      page = 1, 
+      limit = 20, 
+      sortBy = "profile.name", 
+      sortOrder = "asc",
+      internshipStatus,
+      performanceLevel,
+      creditCompletion,
+      search
+    } = req.query;
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Build query for students in mentor's department
+    const query = {
+      "profile.department": department,
+    };
+
+    // Add search filter if provided
+    if (search) {
+      query.$or = [
+        { "profile.name": { $regex: search, $options: "i" } },
+        { studentId: { $regex: search, $options: "i" } },
+        { email: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    // Add performance level filter
+    if (performanceLevel) {
+      if (performanceLevel === "high") {
+        query.readinessScore = { $gte: 80 };
+      } else if (performanceLevel === "medium") {
+        query.readinessScore = { $gte: 50, $lt: 80 };
+      } else if (performanceLevel === "low") {
+        query.readinessScore = { $lt: 50 };
+      }
+    }
+
+    // Add credit completion filter
+    if (creditCompletion) {
+      if (creditCompletion === "completed") {
+        query["credits.earned"] = { $gte: 20 }; // Assuming 20 is the requirement
+      } else if (creditCompletion === "in_progress") {
+        query["credits.earned"] = { $gt: 0, $lt: 20 };
+      } else if (creditCompletion === "not_started") {
+        query["credits.earned"] = 0;
+      }
+    }
+
+    const sortOptions = {};
+    sortOptions[sortBy] = sortOrder === "asc" ? 1 : -1;
+
+    const [students, total] = await Promise.all([
+      Student.find(query)
+        .select("studentId email profile readinessScore credits completedModules")
+        .sort(sortOptions)
+        .skip(skip)
+        .limit(parseInt(limit))
+        .lean(),
+      Student.countDocuments(query),
+    ]);
+
+    // If internship status filter is provided, get application data
+    if (internshipStatus) {
+      const studentIds = students.map(s => s._id);
+      const applications = await Application.find({
+        studentId: { $in: studentIds },
+      }).lean();
+
+      // Filter students based on internship status
+      const filteredStudents = students.filter(student => {
+        const studentApps = applications.filter(
+          app => app.studentId.toString() === student._id.toString()
+        );
+
+        if (internshipStatus === "active") {
+          return studentApps.some(app => app.status === "accepted");
+        } else if (internshipStatus === "applied") {
+          return studentApps.some(app => 
+            ["pending", "shortlisted", "pending_company_review"].includes(app.status)
+          );
+        } else if (internshipStatus === "none") {
+          return studentApps.length === 0;
+        }
+        return true;
+      });
+
+      return res.json(
+        apiSuccess(
+          {
+            students: filteredStudents,
+            pagination: {
+              total: filteredStudents.length,
+              page: parseInt(page),
+              limit: parseInt(limit),
+              pages: Math.ceil(filteredStudents.length / parseInt(limit)),
+            },
+          },
+          "Assigned students retrieved successfully"
+        )
+      );
+    }
+
+    res.json(
+      apiSuccess(
+        {
+          students,
+          pagination: {
+            total,
+            page: parseInt(page),
+            limit: parseInt(limit),
+            pages: Math.ceil(total / parseInt(limit)),
+          },
+        },
+        "Assigned students retrieved successfully"
+      )
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * GET /api/mentor/students/:studentId
+ * Get student details with internship history
+ * Requirements: 8.4
+ */
+export const getStudentDetails = async (req, res, next) => {
+  try {
+    const mentor = await ensureMentorContext(req);
+    const { studentId } = req.params;
+
+    const student = await Student.findOne({ studentId }).lean();
+
+    if (!student) {
+      throw createHttpError(404, "Student not found");
+    }
+
+    // Verify student is in mentor's department
+    if (student.profile.department !== mentor.profile.department) {
+      throw createHttpError(403, "You can only view students from your department");
+    }
+
+    // Get student's internship history
+    const [applications, logbooks, completions] = await Promise.all([
+      Application.find({ studentId: student._id })
+        .populate("internshipId", "title companyId duration startDate")
+        .populate("companyId", "companyName")
+        .sort({ appliedAt: -1 })
+        .lean(),
+      Logbook.find({ studentId: student._id })
+        .populate("internshipId", "title")
+        .sort({ weekNumber: -1 })
+        .lean(),
+      InternshipCompletion.find({ studentId: student._id })
+        .populate("internshipId", "title")
+        .populate("companyId", "companyName")
+        .sort({ completedAt: -1 })
+        .lean(),
+    ]);
+
+    res.json(
+      apiSuccess(
+        {
+          student,
+          internshipHistory: {
+            applications,
+            logbooks,
+            completions,
+          },
+        },
+        "Student details retrieved successfully"
+      )
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * GET /api/mentor/students/:studentId/applications
+ * Get student applications
+ * Requirements: 8.5
+ */
+export const getStudentApplications = async (req, res, next) => {
+  try {
+    const mentor = await ensureMentorContext(req);
+    const { studentId } = req.params;
+    const { status, page = 1, limit = 20 } = req.query;
+
+    const student = await Student.findOne({ studentId }).lean();
+
+    if (!student) {
+      throw createHttpError(404, "Student not found");
+    }
+
+    // Verify student is in mentor's department
+    if (student.profile.department !== mentor.profile.department) {
+      throw createHttpError(403, "You can only view students from your department");
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Build query
+    const query = {
+      studentId: student._id,
+    };
+
+    if (status) {
+      query.status = status;
+    }
+
+    const [applications, total] = await Promise.all([
+      Application.find(query)
+        .populate("internshipId", "title companyId duration startDate department")
+        .populate("companyId", "companyName")
+        .sort({ appliedAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit))
+        .lean(),
+      Application.countDocuments(query),
+    ]);
+
+    res.json(
+      apiSuccess(
+        {
+          applications,
+          pagination: {
+            total,
+            page: parseInt(page),
+            limit: parseInt(limit),
+            pages: Math.ceil(total / parseInt(limit)),
+          },
+        },
+        "Student applications retrieved successfully"
+      )
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * GET /api/mentor/analytics
+ * Get mentor-specific analytics
+ * Requirements: 8.1, 8.3
+ */
+export const getMentorAnalytics = async (req, res, next) => {
+  try {
+    const mentor = await ensureMentorContext(req);
+    const { dateFrom, dateTo } = req.query;
+
+    // Use the internship analytics service
+    const { internshipAnalyticsService } = await import("../services/internshipAnalyticsService.js");
+    
+    const analytics = await internshipAnalyticsService.getMentorAnalytics(
+      mentor.mentorId,
+      { dateFrom, dateTo }
+    );
+
+    res.json(
+      apiSuccess(
+        analytics,
+        "Mentor analytics retrieved successfully"
+      )
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * GET /api/mentor/analytics/department
+ * Get department analytics
+ * Requirements: 8.1, 8.3
+ */
+export const getDepartmentAnalytics = async (req, res, next) => {
+  try {
+    const mentor = await ensureMentorContext(req);
+    const department = mentor.profile.department;
+    const { dateFrom, dateTo } = req.query;
+
+    // Use the internship analytics service
+    const { internshipAnalyticsService } = await import("../services/internshipAnalyticsService.js");
+    
+    const analytics = await internshipAnalyticsService.getDepartmentAnalytics(
+      department,
+      { dateFrom, dateTo }
+    );
+
+    res.json(
+      apiSuccess(
+        analytics,
+        "Department analytics retrieved successfully"
+      )
+    );
+  } catch (error) {
+    next(error);
+  }
+};

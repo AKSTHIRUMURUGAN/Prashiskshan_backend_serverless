@@ -18,7 +18,30 @@ export const applyToInternship = async (req, res, next) => {
         const internship = await Internship.findById(internshipId);
         if (!internship) throw createHttpError(404, "Internship not found");
 
-        if (internship.status !== "approved") throw createHttpError(400, "Internship not accepting applications");
+        // Check if internship is accepting applications
+        // - "open_for_applications": Specific department internships after mentor approval
+        // - "admin_approved": "All" department internships after at least one mentor approval
+        const acceptableStatuses = ["open_for_applications", "admin_approved"];
+        if (!acceptableStatuses.includes(internship.status)) {
+            throw createHttpError(400, "Internship not accepting applications");
+        }
+        
+        // For "All" department internships in admin_approved status, verify student's department has approved
+        if (internship.status === "admin_approved" && internship.department === "All") {
+            const studentDepartment = student.profile.department;
+            const departmentApproved = internship.departmentApprovals?.some(
+                approval => approval.department === studentDepartment
+            );
+            if (!departmentApproved) {
+                throw createHttpError(400, "This internship has not been approved for your department yet");
+            }
+        }
+        
+        // TODO: Re-enable for production
+        // Check if application deadline has passed
+        // if (new Date() > new Date(internship.applicationDeadline)) {
+        //     throw createHttpError(400, "Application deadline has passed");
+        // }
 
         const existingApplication = await Application.findOne({
             studentId: student._id,

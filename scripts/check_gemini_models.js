@@ -6,45 +6,52 @@ import { fileURLToPath } from "url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, "../.env") });
 
-async function listModels() {
+async function testCurrentModels() {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-        console.error("GEMINI_API_KEY not found in environment");
+        console.error("❌ ERROR: GEMINI_API_KEY not found in environment");
         process.exit(1);
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    // For some reason listModels is not directly on genAI instance in some versions, 
-    // but let's try the model manager if available or just try to instantiate a model.
-    // Actually, the SDK doesn't have a listModels method on the main class easily accessible in all versions.
-    // We can try to just run a simple generation with 'gemini-1.5-flash' and see if it works.
+    let testsPassed = 0;
+    let testsFailed = 0;
 
-    console.log("Testing gemini-1.5-flash...");
+    console.log("=".repeat(50));
+    console.log("Testing Gemini API Model Availability");
+    console.log("=".repeat(50));
+    console.log();
+
+    // Test gemini-2.0-flash (current model)
+    console.log("Testing gemini-2.0-flash...");
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
         const result = await model.generateContent("Hello");
-        console.log("gemini-1.5-flash Success:", result.response.text());
+        const responseText = result.response.text();
+        console.log("✅ SUCCESS: gemini-2.0-flash is available");
+        console.log(`   Response: ${responseText.substring(0, 50)}${responseText.length > 50 ? '...' : ''}`);
+        testsPassed++;
     } catch (error) {
-        console.error("gemini-1.5-flash Failed:", error.message);
+        console.error("❌ FAILED: gemini-2.0-flash");
+        console.error(`   Error: ${error.message}`);
+        testsFailed++;
     }
 
-    console.log("Testing gemini-1.5-flash-001...");
-    try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-001" });
-        const result = await model.generateContent("Hello");
-        console.log("gemini-1.5-flash-001 Success:", result.response.text());
-    } catch (error) {
-        console.error("gemini-1.5-flash-001 Failed:", error.message);
-    }
+    console.log();
+    console.log("=".repeat(50));
+    console.log("Test Summary");
+    console.log("=".repeat(50));
+    console.log(`✅ Passed: ${testsPassed}`);
+    console.log(`❌ Failed: ${testsFailed}`);
+    console.log();
 
-    console.log("Testing gemini-pro...");
-    try {
-        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-        const result = await model.generateContent("Hello");
-        console.log("gemini-pro Success:", result.response.text());
-    } catch (error) {
-        console.error("gemini-pro Failed:", error.message);
+    if (testsFailed > 0) {
+        console.error("⚠️  Some tests failed. Please check your API key and model availability.");
+        process.exit(1);
+    } else {
+        console.log("🎉 All tests passed! Gemini API is configured correctly.");
+        process.exit(0);
     }
 }
 
-listModels();
+testCurrentModels();

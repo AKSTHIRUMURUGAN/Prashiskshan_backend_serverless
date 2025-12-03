@@ -10,6 +10,9 @@ import { logbookSummaryService } from "../services/logbookSummaryService.js";
 import { AIInterviewBot } from "../services/interviewBotService.js";
 import { storageService } from "../services/storageService.js";
 import { aiService } from "../services/aiService.js";
+import { internshipService } from "../services/internshipService.js";
+import { applicationService } from "../services/applicationService.js";
+import { aiTaggingService } from "../services/aiTaggingService.js";
 import { apiSuccess } from "../utils/apiResponse.js";
 import { createHttpError, resolveUserFromRequest, sanitizeDoc } from "./helpers/context.js";
 import { get as redisGet, set as redisSet } from "../config/redis.js";
@@ -30,6 +33,69 @@ const buildPagination = (req) => {
   return { page, limit, skip };
 };
 
+export const getStudentProfile = async (req, res, next) => {
+  try {
+    const student = await ensureStudentContext(req);
+
+    // Get credit history
+    const InternshipCompletion = (await import("../models/InternshipCompletion.js")).default;
+    const CreditRequest = (await import("../models/CreditRequest.js")).default;
+
+    const [completions, creditRequests, applications] = await Promise.all([
+      InternshipCompletion.find({ studentId: student._id, status: "completed" })
+        .populate("internshipId", "title department companyId")
+        .populate("companyId", "companyName")
+        .sort({ completionDate: -1 })
+        .lean(),
+      CreditRequest.find({ studentId: student._id })
+        .sort({ createdAt: -1 })
+        .lean(),
+      Application.countDocuments({ studentId: student._id }),
+    ]);
+
+    // Calculate total credits earned
+    const totalCreditsEarned = creditRequests
+      .filter(cr => cr.status === "approved")
+      .reduce((sum, cr) => sum + (cr.creditsRequested || 0), 0);
+
+    // Get internship history
+    const internshipHistory = completions.map(completion => ({
+      internshipId: completion.internshipId?.internshipId,
+      title: completion.internshipId?.title,
+      company: completion.companyId?.companyName,
+      department: completion.internshipId?.department,
+      completionDate: completion.completionDate,
+      hoursWorked: completion.hoursWorked,
+      evaluationScore: completion.evaluationScore,
+      creditsEarned: completion.creditsEarned,
+    }));
+
+    const profile = {
+      student: sanitizeDoc(student, "student"),
+      credits: {
+        total: student.credits?.total || 0,
+        approved: student.credits?.approved || 0,
+        pending: student.credits?.pending || 0,
+        earned: totalCreditsEarned,
+      },
+      readinessScore: student.readinessScore,
+      skills: student.skills || [],
+      completedModules: student.completedModules || [],
+      internshipHistory,
+      stats: {
+        totalApplications: applications,
+        completedInternships: completions.length,
+        creditRequests: creditRequests.length,
+        interviewAttempts: student.interviewAttempts || 0,
+      },
+    };
+
+    res.json(apiSuccess(profile, "Student profile"));
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getStudentDashboard = async (req, res, next) => {
   try {
     const student = await ensureStudentContext(req);
@@ -39,7 +105,24 @@ export const getStudentDashboard = async (req, res, next) => {
       return res.json(apiSuccess(JSON.parse(cached), "Student dashboard"));
     }
 
-    const [applications, logbooks, notifications, recommended] = await Promise.all([
+    // Get mentor info
+    const Mentor = (await import("../models/Mentor.js")).default;
+    let mentorInfo = null;
+    if (student.assignedMentor) {
+      const mentor = await Mentor.findById(student.assignedMentor)
+        .select("mentorId profile department email")
+        .lean();
+      if (mentor) {
+        mentorInfo = {
+          mentorId: mentor.mentorId,
+          name: `${mentor.profile?.firstName || ""} ${mentor.profile?.lastName || ""}`.trim(),
+          department: mentor.department,
+          email: mentor.email,
+        };
+      }
+    }
+
+    const [applications, logbooks, notifications, recommended, activeInternships] = await Promise.all([
       Application.aggregate([
         { $match: { studentId: student._id } },
         {
@@ -52,6 +135,11 @@ export const getStudentDashboard = async (req, res, next) => {
       Logbook.find({ studentId: student._id }).sort({ weekNumber: 1 }).lean(),
       Notification.find({ userId: student._id }).sort({ createdAt: -1 }).limit(10).lean(),
       recommendationService.getRecommendedInternships(student._id.toString(), []),
+      Application.find({ studentId: student._id, status: "accepted" })
+        .populate("internshipId", "internshipId title department companyId startDate")
+        .populate("companyId", "companyName")
+        .limit(5)
+        .lean(),
     ]);
 
     const pendingLogbooks = logbooks.filter((lb) => lb.status === "draft" || lb.status === "submitted").length;
@@ -78,8 +166,10 @@ export const getStudentDashboard = async (req, res, next) => {
 
     const response = {
       student: sanitizeDoc(student, "student"),
+      mentorInfo,
       stats,
       credits: student.credits,
+      activeInternships,
       logbooks: logbooks.slice(-3),
       notifications,
       recommendations: recommended.slice(0, 5),
@@ -96,52 +186,179 @@ export const getStudentDashboard = async (req, res, next) => {
 export const browseInternships = async (req, res, next) => {
   try {
     const student = await ensureStudentContext(req);
-    const { page, limit, skip } = buildPagination(req);
 
-    const filters = { status: "approved", applicationDeadline: { $gte: new Date() } };
-    if (req.query.department) filters.department = req.query.department;
-    if (req.query.location) filters.location = req.query.location;
-    if (req.query.workMode) filters.workMode = req.query.workMode;
-    if (req.query.skills) {
-      const skills = Array.isArray(req.query.skills) ? req.query.skills : req.query.skills.split(",");
-      filters.requiredSkills = { $in: skills.map((s) => s.trim()) };
-    }
-    if (req.query.minStipend) {
-      filters.stipend = { $gte: Number(req.query.minStipend) };
-    }
+    // Build filters from query parameters
+    const filters = {
+      page: req.query.page,
+      limit: req.query.limit,
+      location: req.query.location,
+      workMode: req.query.workMode,
+      skills: req.query.skills,
+      minStipend: req.query.minStipend,
+      maxStipend: req.query.maxStipend,
+      search: req.query.search,
+      sortBy: req.query.sortBy,
+      sortOrder: req.query.sortOrder,
+    };
 
-    const [items, total, appliedIds] = await Promise.all([
-      Internship.find(filters).sort({ postedAt: -1 }).skip(skip).limit(limit).lean(),
-      Internship.countDocuments(filters),
-      Application.find({ studentId: student._id }).distinct("internshipId"),
-    ]);
+    // Get internships using the internship service
+    const result = await internshipService.getInternshipsForStudent(
+      student.studentId,
+      student.profile?.department || student.department,
+      filters
+    );
 
+    // Get applications to check which internships student has already applied to
+    const appliedIds = await Application.find({ studentId: student._id }).distinct("internshipId");
     const appliedSet = new Set(appliedIds.map((id) => id.toString()));
-    const results = items.map((internship) => ({
-      ...internship,
-      alreadyApplied: appliedSet.has(internship._id.toString()),
-      eligible:
-        (!internship.eligibilityRequirements?.minReadinessScore ||
-          student.readinessScore >= internship.eligibilityRequirements.minReadinessScore) &&
-        (!internship.eligibilityRequirements?.requiredModules ||
-          internship.eligibilityRequirements.requiredModules.every((module) =>
-            student.completedModules.includes(module),
-          )),
-    }));
+
+    // Enhance internships with additional student-specific data
+    const enhancedInternships = await Promise.all(
+      result.internships.map(async (internship) => {
+        // Check eligibility
+        const eligible =
+          (!internship.eligibilityRequirements?.minReadinessScore ||
+            student.readinessScore >= internship.eligibilityRequirements.minReadinessScore) &&
+          (!internship.eligibilityRequirements?.requiredModules ||
+            internship.eligibilityRequirements.requiredModules.every((module) =>
+              student.completedModules?.includes(module)
+            ));
+
+        // Calculate AI match score if requested and AI tags exist
+        let matchScore = null;
+        if (req.query.includeMatchScore === "true" && internship.aiTags) {
+          try {
+            const matchResult = await aiTaggingService.calculateMatchScore(
+              {
+                studentId: student.studentId,
+                skills: student.skills || [],
+                department: student.department,
+                year: student.year,
+                readinessScore: student.readinessScore,
+              },
+              {
+                internshipId: internship.internshipId,
+                requiredSkills: internship.requiredSkills,
+                department: internship.department,
+                aiTags: internship.aiTags,
+              },
+              { userId: student.studentId }
+            );
+            matchScore = matchResult;
+          } catch (error) {
+            logger.error("Failed to calculate match score", {
+              studentId: student.studentId,
+              internshipId: internship.internshipId,
+              error: error.message,
+            });
+          }
+        }
+
+        return {
+          ...internship,
+          alreadyApplied: appliedSet.has(internship._id.toString()),
+          eligible,
+          matchScore,
+        };
+      })
+    );
 
     res.json(
       apiSuccess(
         {
-          items: results,
-          pagination: {
-            page,
-            limit,
-            total,
-            pages: Math.ceil(total / limit),
-          },
+          internships: enhancedInternships,
+          pagination: result.pagination,
         },
-        "Internships",
-      ),
+        "Available internships"
+      )
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getInternshipDetails = async (req, res, next) => {
+  try {
+    const student = await ensureStudentContext(req);
+    const { internshipId } = req.params;
+
+    if (!internshipId) {
+      throw createHttpError(400, "internshipId is required");
+    }
+
+    // Get internship details
+    const internship = await Internship.findOne({ internshipId })
+      .populate("companyId", "companyName industry logo description website")
+      .lean();
+
+    if (!internship) {
+      throw createHttpError(404, "Internship not found");
+    }
+
+    // Check if student can view this internship
+    if (internship.status !== "open_for_applications") {
+      throw createHttpError(403, "This internship is not available for viewing");
+    }
+
+    if (internship.department !== student.department) {
+      throw createHttpError(403, "This internship is not available for your department");
+    }
+
+    // Check if student has already applied
+    const existingApplication = await Application.findOne({
+      studentId: student._id,
+      internshipId: internship._id,
+    }).lean();
+
+    // Check eligibility
+    const eligible =
+      (!internship.eligibilityRequirements?.minReadinessScore ||
+        student.readinessScore >= internship.eligibilityRequirements.minReadinessScore) &&
+      (!internship.eligibilityRequirements?.requiredModules ||
+        internship.eligibilityRequirements.requiredModules.every((module) =>
+          student.completedModules?.includes(module)
+        ));
+
+    // Calculate AI match score and analysis
+    let matchAnalysis = null;
+    if (internship.aiTags) {
+      try {
+        matchAnalysis = await aiTaggingService.calculateMatchScore(
+          {
+            studentId: student.studentId,
+            skills: student.skills || [],
+            department: student.department,
+            year: student.year,
+            readinessScore: student.readinessScore,
+          },
+          {
+            internshipId: internship.internshipId,
+            requiredSkills: internship.requiredSkills,
+            department: internship.department,
+            aiTags: internship.aiTags,
+          },
+          { userId: student.studentId }
+        );
+      } catch (error) {
+        logger.error("Failed to calculate match analysis", {
+          studentId: student.studentId,
+          internshipId: internship.internshipId,
+          error: error.message,
+        });
+      }
+    }
+
+    res.json(
+      apiSuccess(
+        {
+          internship,
+          alreadyApplied: !!existingApplication,
+          application: existingApplication,
+          eligible,
+          matchAnalysis,
+        },
+        "Internship details"
+      )
     );
   } catch (error) {
     next(error);
@@ -169,58 +386,35 @@ export const getRecommendedInternships = async (req, res, next) => {
 export const applyToInternship = async (req, res, next) => {
   try {
     const student = await ensureStudentContext(req);
-    const { internshipId, coverLetter, resumeUrl } = req.body;
-    if (!internshipId || !coverLetter) {
-      throw createHttpError(400, "internshipId and coverLetter are required");
-    }
-    if (!mongoose.Types.ObjectId.isValid(internshipId)) {
-      throw createHttpError(400, "Invalid internshipId");
-    }
+    const { internshipId } = req.params;
+    const { coverLetter, resumeUrl } = req.body;
 
-    const internship = await Internship.findById(internshipId);
-    if (!internship) throw createHttpError(404, "Internship not found");
-    if (internship.status !== "approved" || internship.applicationDeadline < new Date()) {
-      throw createHttpError(400, "Internship is not open for applications");
+    if (!internshipId) {
+      throw createHttpError(400, "internshipId is required");
     }
 
-    if (internship.eligibilityRequirements?.minReadinessScore && student.readinessScore < internship.eligibilityRequirements.minReadinessScore) {
-      throw createHttpError(403, "Readiness score below required threshold");
+    if (!coverLetter) {
+      throw createHttpError(400, "coverLetter is required");
     }
 
-    if (
-      internship.eligibilityRequirements?.requiredModules &&
-      !internship.eligibilityRequirements.requiredModules.every((module) => student.completedModules.includes(module))
-    ) {
-      throw createHttpError(403, "Required modules not completed");
-    }
-
-    const exists = await Application.findOne({ studentId: student._id, internshipId });
-    if (exists) throw createHttpError(409, "You have already applied to this internship");
-
-    const application = await Application.create({
-      applicationId: `APP-${Date.now()}`,
-      studentId: student._id,
+    // Use application service to create application
+    const application = await applicationService.createApplication(
+      student._id,
       internshipId,
-      companyId: internship.companyId,
-      department: internship.department,
-      coverLetter,
-      resumeUrl: resumeUrl || student.profile.resume,
-      timeline: [
-        {
-          event: "application_submitted",
-          performedBy: student.studentId,
-          notes: "Application submitted by student",
-        },
-      ],
-    });
+      {
+        coverLetter,
+        resumeUrl: resumeUrl || student.profile?.resumeUrl,
+      }
+    );
 
-    internship.appliedCount += 1;
-    await internship.save();
-
+    // Update student's applied internships list
+    if (!student.appliedInternships) {
+      student.appliedInternships = [];
+    }
     student.appliedInternships.push(application._id);
     await student.save();
 
-    res.status(201).json(apiSuccess({ application }, "Application submitted"));
+    res.status(201).json(apiSuccess({ application }, "Application submitted successfully"));
   } catch (error) {
     next(error);
   }
@@ -229,25 +423,29 @@ export const applyToInternship = async (req, res, next) => {
 export const getMyApplications = async (req, res, next) => {
   try {
     const student = await ensureStudentContext(req);
-    const statusFilter = req.query.status;
 
-    const query = { studentId: student._id };
-    if (statusFilter) query.status = statusFilter;
+    // Build filters from query parameters
+    const filters = {
+      status: req.query.status,
+      companyFeedbackStatus: req.query.companyFeedbackStatus,
+      appliedFrom: req.query.appliedFrom,
+      appliedTo: req.query.appliedTo,
+      page: req.query.page,
+      limit: req.query.limit,
+      sortBy: req.query.sortBy,
+      sortOrder: req.query.sortOrder,
+    };
 
-    const applications = await Application.find(query)
-      .populate("internshipId")
-      .populate("companyId")
-      .sort({ appliedAt: -1 })
-      .lean();
+    // Get applications using the application service
+    const result = await applicationService.getApplicationsByStudent(student._id, filters);
 
     // Import InternshipCompletion to check credit request availability
     const InternshipCompletion = (await import("../models/InternshipCompletion.js")).default;
     
     // Get completion records for all applications
-    const applicationIds = applications.map(app => app._id);
     const completions = await InternshipCompletion.find({
       studentId: student._id,
-      internshipId: { $in: applications.map(app => app.internshipId?._id).filter(Boolean) }
+      internshipId: { $in: result.applications.map(app => app.internshipId?._id).filter(Boolean) }
     }).lean();
     
     // Create a map of internshipId to completion data
@@ -263,7 +461,7 @@ export const getMyApplications = async (req, res, next) => {
     });
     
     // Enhance applications with credit request availability
-    const enhancedApplications = applications.map(app => {
+    const enhancedApplications = result.applications.map(app => {
       const internshipId = app.internshipId?._id?.toString();
       const completionData = completionMap.get(internshipId) || {
         isCompleted: false,
@@ -279,7 +477,79 @@ export const getMyApplications = async (req, res, next) => {
       };
     });
 
-    res.json(apiSuccess({ applications: enhancedApplications }, "Student applications"));
+    res.json(
+      apiSuccess(
+        {
+          applications: enhancedApplications,
+          pagination: result.pagination,
+        },
+        "Student applications"
+      )
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getApplicationDetails = async (req, res, next) => {
+  try {
+    const student = await ensureStudentContext(req);
+    const { applicationId } = req.params;
+
+    if (!applicationId) {
+      throw createHttpError(400, "applicationId is required");
+    }
+
+    // Find application by applicationId (custom ID) or MongoDB _id
+    let application;
+    if (mongoose.Types.ObjectId.isValid(applicationId) && applicationId.length === 24) {
+      application = await Application.findOne({ _id: applicationId, studentId: student._id })
+        .populate("internshipId")
+        .populate("companyId", "companyName industry logo")
+        .lean();
+    } else {
+      application = await Application.findOne({ applicationId, studentId: student._id })
+        .populate("internshipId")
+        .populate("companyId", "companyName industry logo")
+        .lean();
+    }
+
+    if (!application) {
+      throw createHttpError(404, "Application not found");
+    }
+
+    // Check credit request availability
+    const InternshipCompletion = (await import("../models/InternshipCompletion.js")).default;
+    const completion = await InternshipCompletion.findOne({
+      studentId: student._id,
+      internshipId: application.internshipId?._id
+    }).lean();
+
+    const creditRequest = completion ? {
+      isCompleted: completion.status === 'completed',
+      creditRequestAvailable: completion.status === 'completed' && !completion.creditRequest?.requested,
+      creditRequestStatus: completion.creditRequest?.status,
+      creditRequestId: completion.creditRequest?.requestId,
+      completionId: completion._id
+    } : {
+      isCompleted: false,
+      creditRequestAvailable: false,
+      creditRequestStatus: null,
+      creditRequestId: null,
+      completionId: null
+    };
+
+    res.json(
+      apiSuccess(
+        {
+          application: {
+            ...application,
+            creditRequest
+          }
+        },
+        "Application details"
+      )
+    );
   } catch (error) {
     next(error);
   }

@@ -248,26 +248,92 @@ const openapi = {
       Internship: {
         type: "object",
         properties: {
-          internshipId: { type: "string" },
+          internshipId: { type: "string", example: "INT-2024001" },
+          companyId: { type: "string", example: "COM-2024001" },
           title: { type: "string", example: "Full Stack Developer Intern" },
           description: { type: "string", example: "Work on exciting projects..." },
           department: { type: "string", example: "Computer Science" },
           requiredSkills: { type: "array", items: { type: "string" }, example: ["JavaScript", "React", "Node.js"] },
+          optionalSkills: { type: "array", items: { type: "string" }, example: ["TypeScript", "Docker"] },
           duration: { type: "string", example: "6 months" },
           stipend: { type: "number", example: 15000 },
           location: { type: "string", example: "Mumbai" },
           workMode: { type: "string", enum: ["remote", "onsite", "hybrid"], example: "hybrid" },
-          status: { type: "string", example: "active" },
+          status: { 
+            type: "string", 
+            enum: ["draft", "pending_admin_verification", "admin_approved", "admin_rejected", "mentor_rejected", "open_for_applications", "closed", "cancelled"], 
+            example: "open_for_applications",
+            description: "Internship workflow status"
+          },
           slots: { type: "integer", minimum: 1, maximum: 100, example: 5 },
+          slotsRemaining: { type: "integer", example: 3, description: "Available slots after acceptances" },
+          appliedCount: { type: "integer", example: 15, description: "Total applications received" },
           startDate: { type: "string", format: "date", example: "2024-06-01" },
           applicationDeadline: { type: "string", format: "date-time", example: "2024-05-15T23:59:59Z" },
+          responsibilities: { type: "array", items: { type: "string" }, example: ["Develop features", "Write tests"] },
+          learningOpportunities: { type: "array", items: { type: "string" }, example: ["Mentorship", "Code reviews"] },
           eligibilityRequirements: {
             type: "object",
             properties: {
               minYear: { type: "integer", example: 2 },
               minReadinessScore: { type: "number", example: 60 },
+              requiredModules: { type: "array", items: { type: "string" } }
             },
           },
+          adminReview: {
+            type: "object",
+            properties: {
+              reviewedBy: { type: "string", example: "ADM-001" },
+              reviewedAt: { type: "string", format: "date-time" },
+              decision: { type: "string", enum: ["approved", "rejected"] },
+              comments: { type: "string" },
+              reasons: { type: "array", items: { type: "string" } }
+            },
+            description: "Admin verification details"
+          },
+          mentorApproval: {
+            type: "object",
+            properties: {
+              status: { type: "string", enum: ["pending", "approved", "rejected"], default: "pending" },
+              mentorId: { type: "string", example: "MEN-001" },
+              approvedAt: { type: "string", format: "date-time" },
+              comments: { type: "string" },
+              department: { type: "string" }
+            },
+            description: "Mentor approval details"
+          },
+          aiTags: {
+            type: "object",
+            properties: {
+              primarySkills: { type: "array", items: { type: "string" }, example: ["JavaScript", "React", "Node.js"] },
+              difficulty: { type: "string", enum: ["beginner", "intermediate", "advanced"], example: "intermediate" },
+              careerPath: { type: "string", example: "Software Engineering" },
+              industryFit: { type: "array", items: { type: "string" }, example: ["Technology", "Startups"] },
+              learningIntensity: { type: "string", example: "moderate" },
+              technicalDepth: { type: "string", example: "moderate" },
+              generatedAt: { type: "string", format: "date-time" }
+            },
+            description: "AI-generated tags from Gemini API"
+          },
+          auditTrail: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                timestamp: { type: "string", format: "date-time" },
+                actor: { type: "string" },
+                actorRole: { type: "string" },
+                action: { type: "string" },
+                fromStatus: { type: "string" },
+                toStatus: { type: "string" },
+                reason: { type: "string" }
+              }
+            },
+            description: "Complete audit trail of status changes"
+          },
+          postedBy: { type: "string", example: "COM-2024001" },
+          postedAt: { type: "string", format: "date-time" },
+          closedAt: { type: "string", format: "date-time" }
         },
       },
       Application: {
@@ -386,14 +452,129 @@ const openapi = {
     "/auth/account": { delete: { summary: "Delete account", tags: ["Authentication"], responses: { 204: { description: "Deleted" } } } },
 
     // Student Routes
-    "/students/dashboard": { get: { summary: "Get dashboard", tags: ["Students"], responses: { 200: { description: "Dashboard data" } } } },
-    "/students/internships": { get: { summary: "Browse internships", tags: ["Students"], responses: { 200: { description: "List of internships", content: { "application/json": { schema: { type: "array", items: { $ref: "#/components/schemas/Internship" } } } } } } } },
-    "/students/internships/recommended": { get: { summary: "Get recommendations", tags: ["Students"], responses: { 200: { description: "Recommended internships" } } } },
-    "/students/applications": {
-      get: { summary: "Get my applications", tags: ["Students"], responses: { 200: { description: "List", content: { "application/json": { schema: { type: "array", items: { $ref: "#/components/schemas/Application" } } } } } } },
-      post: { summary: "Apply to internship", tags: ["Students"], requestBody: { content: { "application/json": { schema: { $ref: "#/components/schemas/InternshipApplicationRequest" } } } }, responses: { 201: { description: "Applied" } } }
+    "/students/dashboard": { 
+      get: { 
+        summary: "Get student dashboard with mentor info", 
+        description: "Get dashboard data including mentor details, application statuses, and active internships",
+        tags: ["Students", "Dashboard"], 
+        security: [{ BearerAuth: [] }], 
+        responses: { 200: { description: "Dashboard data" } } 
+      } 
     },
-    "/students/applications/{applicationId}": { delete: { summary: "Withdraw application", tags: ["Students"], parameters: [{ name: "applicationId", in: "path", required: true, schema: { type: "string" } }], responses: { 200: { description: "Withdrawn" } } } },
+    "/students/profile": { 
+      get: { 
+        summary: "Get profile with credits and history", 
+        description: "Get student profile including total credits, readiness score, and internship history",
+        tags: ["Students"], 
+        security: [{ BearerAuth: [] }], 
+        responses: { 200: { description: "Student profile" } } 
+      } 
+    },
+    
+    // Student Internship Discovery (Requirements: 4.1, 4.2)
+    "/students/internships": { 
+      get: { 
+        summary: "Browse available internships with AI match scores", 
+        description: "Browse mentor-approved internships for student's department with optional AI match scoring",
+        tags: ["Students", "Internships"], 
+        security: [{ BearerAuth: [] }], 
+        parameters: [
+          { name: "page", in: "query", schema: { type: "integer", default: 1 } },
+          { name: "limit", in: "query", schema: { type: "integer", default: 20 } },
+          { name: "location", in: "query", schema: { type: "string" }, description: "Filter by location" },
+          { name: "workMode", in: "query", schema: { type: "string", enum: ["remote", "onsite", "hybrid"] } },
+          { name: "skills", in: "query", schema: { type: "string" }, description: "Comma-separated skills" },
+          { name: "minStipend", in: "query", schema: { type: "number" } },
+          { name: "maxStipend", in: "query", schema: { type: "number" } },
+          { name: "search", in: "query", schema: { type: "string" } },
+          { name: "includeMatchScore", in: "query", schema: { type: "boolean" }, description: "Include AI match scores" }
+        ],
+        responses: { 
+          200: { 
+            description: "List of internships with optional match scores",
+            content: { "application/json": { schema: { type: "array", items: { $ref: "#/components/schemas/Internship" } } } } 
+          } 
+        } 
+      } 
+    },
+    "/students/internships/recommended": { get: { summary: "Get AI recommendations", tags: ["Students", "Internships"], security: [{ BearerAuth: [] }], responses: { 200: { description: "Recommended internships" } } } },
+    "/students/internships/{internshipId}": { 
+      get: { 
+        summary: "Get internship details with match analysis", 
+        description: "Get complete internship details with AI match score and analysis",
+        tags: ["Students", "Internships"], 
+        security: [{ BearerAuth: [] }], 
+        parameters: [{ name: "internshipId", in: "path", required: true, schema: { type: "string" } }],
+        responses: { 200: { description: "Internship details with match analysis" } } 
+      } 
+    },
+    "/students/internships/{internshipId}/apply": { 
+      post: { 
+        summary: "Apply to internship", 
+        description: "Submit application to internship (creates notification for company)",
+        tags: ["Students", "Applications"], 
+        security: [{ BearerAuth: [] }], 
+        parameters: [{ name: "internshipId", in: "path", required: true, schema: { type: "string" } }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["coverLetter"],
+                properties: {
+                  coverLetter: { type: "string" },
+                  resumeUrl: { type: "string" }
+                }
+              }
+            }
+          }
+        },
+        responses: { 
+          201: { description: "Application submitted" },
+          400: { description: "Deadline passed or already applied" },
+          409: { description: "Duplicate application" }
+        } 
+      } 
+    },
+    
+    // Student Application Management (Requirements: 7.2)
+    "/students/applications": {
+      get: { 
+        summary: "List my applications with status", 
+        description: "Get all applications with current status and company feedback",
+        tags: ["Students", "Applications"], 
+        security: [{ BearerAuth: [] }], 
+        parameters: [
+          { name: "status", in: "query", schema: { type: "string" }, description: "Filter by status" },
+          { name: "page", in: "query", schema: { type: "integer", default: 1 } },
+          { name: "limit", in: "query", schema: { type: "integer", default: 20 } }
+        ],
+        responses: { 
+          200: { 
+            description: "List of applications",
+            content: { "application/json": { schema: { type: "array", items: { $ref: "#/components/schemas/Application" } } } } 
+          } 
+        } 
+      }
+    },
+    "/students/applications/{applicationId}": { 
+      get: { 
+        summary: "Get application details", 
+        description: "Get application details with status tracking",
+        tags: ["Students", "Applications"], 
+        security: [{ BearerAuth: [] }], 
+        parameters: [{ name: "applicationId", in: "path", required: true, schema: { type: "string" } }],
+        responses: { 200: { description: "Application details" } } 
+      },
+      delete: { 
+        summary: "Withdraw application", 
+        tags: ["Students", "Applications"], 
+        security: [{ BearerAuth: [] }], 
+        parameters: [{ name: "applicationId", in: "path", required: true, schema: { type: "string" } }], 
+        responses: { 200: { description: "Withdrawn" } } 
+      } 
+    },
     "/students/modules/recommended": { get: { summary: "Get recommended modules", tags: ["Students"], responses: { 200: { description: "Modules" } } } },
     "/students/modules/start": { post: { summary: "Start module", tags: ["Students"], requestBody: { content: { "application/json": { schema: { $ref: "#/components/schemas/StartModuleRequest" } } } }, responses: { 200: { description: "Started" } } } },
     "/students/modules/complete": { post: { summary: "Complete module", tags: ["Students"], requestBody: { content: { "application/json": { schema: { $ref: "#/components/schemas/CompleteModuleRequest" } } } }, responses: { 200: { description: "Completed" } } } },
@@ -410,63 +591,601 @@ const openapi = {
     "/students/chatbot": { post: { summary: "Chatbot query", tags: ["Students"], requestBody: { content: { "application/json": { schema: { $ref: "#/components/schemas/ChatbotQueryRequest" } } } }, responses: { 200: { description: "Response" } } } },
 
     // Company Routes
-    "/companies/dashboard": { get: { summary: "Get dashboard", tags: ["Companies"], responses: { 200: { description: "Dashboard" } } } },
+    "/companies/dashboard": { get: { summary: "Get dashboard", tags: ["Companies"], security: [{ BearerAuth: [] }], responses: { 200: { description: "Dashboard" } } } },
     "/companies/profile": {
-      get: { summary: "Get profile", tags: ["Companies"], responses: { 200: { description: "Profile", content: { "application/json": { schema: { $ref: "#/components/schemas/Company" } } } } } },
-      patch: { summary: "Update profile", tags: ["Companies"], responses: { 200: { description: "Updated" } } }
+      get: { summary: "Get profile", tags: ["Companies"], security: [{ BearerAuth: [] }], responses: { 200: { description: "Profile", content: { "application/json": { schema: { $ref: "#/components/schemas/Company" } } } } } },
+      patch: { summary: "Update profile", tags: ["Companies"], security: [{ BearerAuth: [] }], responses: { 200: { description: "Updated" } } }
     },
+    
+    // Company Internship Management (Requirements: 1.1, 1.2, 1.4, 1.5)
     "/companies/internships": {
-      get: { summary: "Get internships", tags: ["Companies"], responses: { 200: { description: "List" } } },
-      post: { summary: "Create internship", tags: ["Companies"], requestBody: { content: { "application/json": { schema: { $ref: "#/components/schemas/Internship" } } } }, responses: { 201: { description: "Created" } } }
+      get: { 
+        summary: "Get all company internships", 
+        description: "Get all internships posted by the company with filtering",
+        tags: ["Companies", "Internships"], 
+        security: [{ BearerAuth: [] }], 
+        parameters: [
+          { name: "status", in: "query", schema: { type: "string" }, description: "Filter by status" },
+          { name: "page", in: "query", schema: { type: "integer", default: 1 } },
+          { name: "limit", in: "query", schema: { type: "integer", default: 20 } }
+        ],
+        responses: { 200: { description: "List of internships" } } 
+      },
+      post: { 
+        summary: "Create internship with AI tagging", 
+        description: "Create new internship (status: pending_admin_verification). AI tags generated asynchronously.",
+        tags: ["Companies", "Internships"], 
+        security: [{ BearerAuth: [] }], 
+        requestBody: { 
+          required: true,
+          content: { 
+            "application/json": { 
+              schema: { 
+                type: "object",
+                required: ["title", "description", "department", "duration", "requiredSkills", "startDate", "applicationDeadline", "slots"],
+                properties: {
+                  title: { type: "string", example: "Full Stack Developer Intern" },
+                  description: { type: "string" },
+                  department: { type: "string", example: "Computer Science" },
+                  duration: { type: "string", example: "6 months" },
+                  requiredSkills: { type: "array", items: { type: "string" }, example: ["JavaScript", "React", "Node.js"] },
+                  optionalSkills: { type: "array", items: { type: "string" } },
+                  startDate: { type: "string", format: "date" },
+                  applicationDeadline: { type: "string", format: "date-time" },
+                  slots: { type: "integer", minimum: 1 },
+                  stipend: { type: "number" },
+                  location: { type: "string" },
+                  workMode: { type: "string", enum: ["remote", "onsite", "hybrid"] },
+                  responsibilities: { type: "array", items: { type: "string" } },
+                  learningOpportunities: { type: "array", items: { type: "string" } },
+                  eligibilityRequirements: { 
+                    type: "object",
+                    properties: {
+                      minYear: { type: "integer" },
+                      minReadinessScore: { type: "number" }
+                    }
+                  }
+                }
+              } 
+            } 
+          } 
+        },
+        responses: { 
+          201: { description: "Internship created" },
+          400: { description: "Validation error" },
+          403: { description: "Company not verified" }
+        } 
+      }
     },
     "/companies/internships/{internshipId}": {
-      put: { summary: "Update internship", tags: ["Companies"], parameters: [{ name: "internshipId", in: "path", required: true, schema: { type: "string" } }], responses: { 200: { description: "Updated" } } },
-      delete: { summary: "Delete internship", tags: ["Companies"], parameters: [{ name: "internshipId", in: "path", required: true, schema: { type: "string" } }], responses: { 200: { description: "Deleted" } } }
+      get: { 
+        summary: "Get internship details", 
+        tags: ["Companies", "Internships"], 
+        security: [{ BearerAuth: [] }], 
+        parameters: [{ name: "internshipId", in: "path", required: true, schema: { type: "string" } }],
+        responses: { 200: { description: "Internship details" } } 
+      },
+      patch: { 
+        summary: "Update internship (resets to pending_admin_verification)", 
+        description: "Update internship details. Status resets to pending_admin_verification for re-review.",
+        tags: ["Companies", "Internships"], 
+        security: [{ BearerAuth: [] }], 
+        parameters: [{ name: "internshipId", in: "path", required: true, schema: { type: "string" } }], 
+        responses: { 200: { description: "Updated" } } 
+      },
+      delete: { 
+        summary: "Cancel internship", 
+        tags: ["Companies", "Internships"], 
+        security: [{ BearerAuth: [] }], 
+        parameters: [{ name: "internshipId", in: "path", required: true, schema: { type: "string" } }], 
+        responses: { 200: { description: "Cancelled" } } 
+      }
     },
-    "/companies/internships/{internshipId}/complete": { post: { summary: "Complete internship", tags: ["Companies"], parameters: [{ name: "internshipId", in: "path", required: true, schema: { type: "string" } }], responses: { 200: { description: "Completed" } } } },
-    "/companies/internships/{internshipId}/applicants": { get: { summary: "Get applicants", tags: ["Companies"], parameters: [{ name: "internshipId", in: "path", required: true, schema: { type: "string" } }], responses: { 200: { description: "Applicants" } } } },
-    "/companies/applications/review": { post: { summary: "Review application", tags: ["Companies"], responses: { 200: { description: "Reviewed" } } } },
-    "/companies/applications/shortlist": { post: { summary: "Shortlist candidate", tags: ["Companies"], responses: { 200: { description: "Shortlisted" } } } },
-    "/companies/applications/reject": { post: { summary: "Reject candidate", tags: ["Companies"], responses: { 200: { description: "Rejected" } } } },
-    "/companies/interns/progress": { get: { summary: "Intern progress", tags: ["Companies"], responses: { 200: { description: "Progress" } } } },
-    "/companies/logbooks/{logbookId}/feedback": { post: { summary: "Logbook feedback", tags: ["Companies"], parameters: [{ name: "logbookId", in: "path", required: true, schema: { type: "string" } }], responses: { 200: { description: "Feedback saved" } } } },
-    "/companies/events": { post: { summary: "Create event", tags: ["Companies"], responses: { 201: { description: "Created" } } } },
-    "/companies/challenges": { post: { summary: "Create challenge", tags: ["Companies"], responses: { 201: { description: "Created" } } } },
+    "/companies/internships/{internshipId}/complete": { post: { summary: "Complete internship", tags: ["Companies"], security: [{ BearerAuth: [] }], parameters: [{ name: "internshipId", in: "path", required: true, schema: { type: "string" } }], responses: { 200: { description: "Completed" } } } },
+    
+    // Company Application Management (Requirements: 5.2, 5.3)
+    "/companies/internships/{internshipId}/applicants": { 
+      get: { 
+        summary: "Get applicants with filters", 
+        description: "Get all applicants for an internship with filtering and pagination",
+        tags: ["Companies", "Applications"], 
+        security: [{ BearerAuth: [] }], 
+        parameters: [
+          { name: "internshipId", in: "path", required: true, schema: { type: "string" } },
+          { name: "status", in: "query", schema: { type: "string" }, description: "Filter by status" },
+          { name: "companyFeedbackStatus", in: "query", schema: { type: "string" }, description: "Filter by feedback status" },
+          { name: "search", in: "query", schema: { type: "string" }, description: "Search by name" },
+          { name: "page", in: "query", schema: { type: "integer", default: 1 } },
+          { name: "limit", in: "query", schema: { type: "integer", default: 20 } }
+        ],
+        responses: { 200: { description: "List of applicants" } } 
+      } 
+    },
+    "/companies/applications/approve": { 
+      post: { 
+        summary: "Approve application", 
+        description: "Approve application (decrements slots, notifies student)",
+        tags: ["Companies", "Applications"], 
+        security: [{ BearerAuth: [] }], 
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["applicationId"],
+                properties: {
+                  applicationId: { type: "string" },
+                  feedback: { type: "string" },
+                  nextSteps: { type: "string" }
+                }
+              }
+            }
+          }
+        },
+        responses: { 
+          200: { description: "Application approved" },
+          400: { description: "No slots remaining" }
+        } 
+      } 
+    },
+    "/companies/applications/reject-single": { 
+      post: { 
+        summary: "Reject application", 
+        description: "Reject application with optional feedback",
+        tags: ["Companies", "Applications"], 
+        security: [{ BearerAuth: [] }], 
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["applicationId"],
+                properties: {
+                  applicationId: { type: "string" },
+                  reason: { type: "string" },
+                  feedback: { type: "string" }
+                }
+              }
+            }
+          }
+        },
+        responses: { 200: { description: "Application rejected" } } 
+      } 
+    },
+    "/companies/applications/{applicationId}": { 
+      get: { 
+        summary: "Get application details", 
+        tags: ["Companies", "Applications"], 
+        security: [{ BearerAuth: [] }], 
+        parameters: [{ name: "applicationId", in: "path", required: true, schema: { type: "string" } }],
+        responses: { 200: { description: "Application details" } } 
+      } 
+    },
+    "/companies/applications/review": { post: { summary: "Review application", tags: ["Companies"], security: [{ BearerAuth: [] }], responses: { 200: { description: "Reviewed" } } } },
+    "/companies/applications/shortlist": { post: { summary: "Shortlist candidate", tags: ["Companies"], security: [{ BearerAuth: [] }], responses: { 200: { description: "Shortlisted" } } } },
+    "/companies/applications/reject": { post: { summary: "Reject candidates (bulk)", tags: ["Companies"], security: [{ BearerAuth: [] }], responses: { 200: { description: "Rejected" } } } },
+    "/companies/interns/progress": { get: { summary: "Intern progress", tags: ["Companies"], security: [{ BearerAuth: [] }], responses: { 200: { description: "Progress" } } } },
+    "/companies/logbooks/{logbookId}/feedback": { post: { summary: "Logbook feedback", tags: ["Companies"], security: [{ BearerAuth: [] }], parameters: [{ name: "logbookId", in: "path", required: true, schema: { type: "string" } }], responses: { 200: { description: "Feedback saved" } } } },
+    "/companies/events": { post: { summary: "Create event", tags: ["Companies"], security: [{ BearerAuth: [] }], responses: { 201: { description: "Created" } } } },
+    "/companies/challenges": { post: { summary: "Create challenge", tags: ["Companies"], security: [{ BearerAuth: [] }], responses: { 201: { description: "Created" } } } },
+    
+    // Company Analytics (Requirements: 9.1, 9.2, 9.3, 9.4, 9.5)
+    "/companies/analytics": { 
+      get: { 
+        summary: "Get company analytics with date range", 
+        description: "Get analytics including application funnel and completion metrics",
+        tags: ["Companies", "Analytics"], 
+        security: [{ BearerAuth: [] }], 
+        parameters: [
+          { name: "dateFrom", in: "query", schema: { type: "string", format: "date" }, description: "Start date" },
+          { name: "dateTo", in: "query", schema: { type: "string", format: "date" }, description: "End date" }
+        ],
+        responses: { 200: { description: "Company analytics" } } 
+      } 
+    },
+    "/companies/analytics/export": { 
+      get: { 
+        summary: "Export analytics report", 
+        description: "Export analytics in CSV or PDF format",
+        tags: ["Companies", "Analytics"], 
+        security: [{ BearerAuth: [] }], 
+        parameters: [
+          { name: "format", in: "query", schema: { type: "string", enum: ["csv", "pdf"], default: "csv" } },
+          { name: "dateFrom", in: "query", schema: { type: "string", format: "date" } },
+          { name: "dateTo", in: "query", schema: { type: "string", format: "date" } }
+        ],
+        responses: { 200: { description: "Analytics report file" } } 
+      } 
+    },
+    "/companies/internships/{internshipId}/metrics": { 
+      get: { 
+        summary: "Get internship-specific metrics", 
+        description: "Get detailed metrics for a specific internship",
+        tags: ["Companies", "Analytics"], 
+        security: [{ BearerAuth: [] }], 
+        parameters: [{ name: "internshipId", in: "path", required: true, schema: { type: "string" } }],
+        responses: { 200: { description: "Internship metrics" } } 
+      } 
+    },
 
     // Mentor Routes
-    "/mentors/dashboard": { get: { summary: "Get dashboard", tags: ["Mentors"], responses: { 200: { description: "Dashboard" } } } },
-    "/mentors/applications/pending": { get: { summary: "Pending applications", tags: ["Mentors"], responses: { 200: { description: "List" } } } },
-    "/mentors/applications/{applicationId}": { get: { summary: "Application details", tags: ["Mentors"], parameters: [{ name: "applicationId", in: "path", required: true, schema: { type: "string" } }], responses: { 200: { description: "Details" } } } },
-    "/mentors/applications/{applicationId}/approve": { post: { summary: "Approve application", tags: ["Mentors"], parameters: [{ name: "applicationId", in: "path", required: true, schema: { type: "string" } }], responses: { 200: { description: "Approved" } } } },
-    "/mentors/applications/{applicationId}/reject": { post: { summary: "Reject application", tags: ["Mentors"], parameters: [{ name: "applicationId", in: "path", required: true, schema: { type: "string" } }], responses: { 200: { description: "Rejected" } } } },
-    "/mentors/logbooks/pending": { get: { summary: "Pending logbooks", tags: ["Mentors"], responses: { 200: { description: "List" } } } },
-    "/mentors/logbooks/{logbookId}": { get: { summary: "Logbook details", tags: ["Mentors"], parameters: [{ name: "logbookId", in: "path", required: true, schema: { type: "string" } }], responses: { 200: { description: "Details" } } } },
-    "/mentors/logbooks/{logbookId}/approve": { post: { summary: "Approve logbook", tags: ["Mentors"], parameters: [{ name: "logbookId", in: "path", required: true, schema: { type: "string" } }], responses: { 200: { description: "Approved" } } } },
-    "/mentors/logbooks/{logbookId}/revision": { post: { summary: "Request revision", tags: ["Mentors"], parameters: [{ name: "logbookId", in: "path", required: true, schema: { type: "string" } }], responses: { 200: { description: "Requested" } } } },
-    "/mentors/skill-gaps": { get: { summary: "Skill gap analysis", tags: ["Mentors"], responses: { 200: { description: "Analysis" } } } },
-    "/mentors/department/performance": { get: { summary: "Department performance", tags: ["Mentors"], responses: { 200: { description: "Performance" } } } },
+    "/mentors/dashboard": { get: { summary: "Get dashboard", tags: ["Mentors"], security: [{ BearerAuth: [] }], responses: { 200: { description: "Dashboard" } } } },
+    "/mentors/applications/pending": { get: { summary: "Pending applications", tags: ["Mentors"], security: [{ BearerAuth: [] }], responses: { 200: { description: "List" } } } },
+    "/mentors/applications/{applicationId}": { get: { summary: "Application details", tags: ["Mentors"], security: [{ BearerAuth: [] }], parameters: [{ name: "applicationId", in: "path", required: true, schema: { type: "string" } }], responses: { 200: { description: "Details" } } } },
+    "/mentors/applications/{applicationId}/approve": { post: { summary: "Approve application", tags: ["Mentors"], security: [{ BearerAuth: [] }], parameters: [{ name: "applicationId", in: "path", required: true, schema: { type: "string" } }], responses: { 200: { description: "Approved" } } } },
+    "/mentors/applications/{applicationId}/reject": { post: { summary: "Reject application", tags: ["Mentors"], security: [{ BearerAuth: [] }], parameters: [{ name: "applicationId", in: "path", required: true, schema: { type: "string" } }], responses: { 200: { description: "Rejected" } } } },
+    "/mentors/logbooks/pending": { get: { summary: "Pending logbooks", tags: ["Mentors"], security: [{ BearerAuth: [] }], responses: { 200: { description: "List" } } } },
+    "/mentors/logbooks/{logbookId}": { get: { summary: "Logbook details", tags: ["Mentors"], security: [{ BearerAuth: [] }], parameters: [{ name: "logbookId", in: "path", required: true, schema: { type: "string" } }], responses: { 200: { description: "Details" } } } },
+    "/mentors/logbooks/{logbookId}/approve": { post: { summary: "Approve logbook", tags: ["Mentors"], security: [{ BearerAuth: [] }], parameters: [{ name: "logbookId", in: "path", required: true, schema: { type: "string" } }], responses: { 200: { description: "Approved" } } } },
+    "/mentors/logbooks/{logbookId}/revision": { post: { summary: "Request revision", tags: ["Mentors"], security: [{ BearerAuth: [] }], parameters: [{ name: "logbookId", in: "path", required: true, schema: { type: "string" } }], responses: { 200: { description: "Requested" } } } },
+    "/mentors/skill-gaps": { get: { summary: "Skill gap analysis", tags: ["Mentors"], security: [{ BearerAuth: [] }], responses: { 200: { description: "Analysis" } } } },
+    "/mentors/department/performance": { get: { summary: "Department performance", tags: ["Mentors"], security: [{ BearerAuth: [] }], responses: { 200: { description: "Performance" } } } },
     "/mentors/interventions": {
-      get: { summary: "Get interventions", tags: ["Mentors"], responses: { 200: { description: "List" } } },
-      post: { summary: "Create intervention", tags: ["Mentors"], responses: { 201: { description: "Created" } } }
+      get: { summary: "Get interventions", tags: ["Mentors"], security: [{ BearerAuth: [] }], responses: { 200: { description: "List" } } },
+      post: { summary: "Create intervention", tags: ["Mentors"], security: [{ BearerAuth: [] }], responses: { 201: { description: "Created" } } }
     },
-    "/mentors/students/{studentId}/progress": { get: { summary: "Student progress", tags: ["Mentors"], parameters: [{ name: "studentId", in: "path", required: true, schema: { type: "string" } }], responses: { 200: { description: "Progress" } } } },
+    "/mentors/students/{studentId}/progress": { get: { summary: "Student progress", tags: ["Mentors"], security: [{ BearerAuth: [] }], parameters: [{ name: "studentId", in: "path", required: true, schema: { type: "string" } }], responses: { 200: { description: "Progress" } } } },
+    
+    // Mentor Internship Approval Endpoints (Requirements: 3.1, 3.2, 3.3)
+    "/mentors/internships/pending": { 
+      get: { 
+        summary: "List pending internships for mentor approval", 
+        description: "Get admin-approved internships awaiting mentor approval for their department",
+        tags: ["Mentors", "Internship Approval"], 
+        security: [{ BearerAuth: [] }], 
+        parameters: [
+          { name: "page", in: "query", schema: { type: "integer", default: 1 }, description: "Page number" },
+          { name: "limit", in: "query", schema: { type: "integer", default: 20 }, description: "Items per page" },
+          { name: "sortBy", in: "query", schema: { type: "string", default: "postedAt" }, description: "Sort field" },
+          { name: "sortOrder", in: "query", schema: { type: "string", enum: ["asc", "desc"], default: "desc" }, description: "Sort order" }
+        ],
+        responses: { 
+          200: { 
+            description: "List of pending internships",
+            content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, data: { type: "object", properties: { internships: { type: "array", items: { $ref: "#/components/schemas/Internship" } }, pagination: { $ref: "#/components/schemas/Pagination" } } } } } } }
+          } 
+        } 
+      } 
+    },
+    "/mentors/internships/{internshipId}": { 
+      get: { 
+        summary: "Get internship details for review", 
+        description: "Get complete internship details for mentor review",
+        tags: ["Mentors", "Internship Approval"], 
+        security: [{ BearerAuth: [] }], 
+        parameters: [{ name: "internshipId", in: "path", required: true, schema: { type: "string" }, description: "Internship ID" }],
+        responses: { 
+          200: { description: "Internship details", content: { "application/json": { schema: { $ref: "#/components/schemas/Internship" } } } },
+          404: { description: "Internship not found" }
+        } 
+      } 
+    },
+    "/mentors/internships/{internshipId}/approve": { 
+      post: { 
+        summary: "Approve internship for department", 
+        description: "Approve internship making it visible to students (transitions to open_for_applications status)",
+        tags: ["Mentors", "Internship Approval"], 
+        security: [{ BearerAuth: [] }], 
+        parameters: [{ name: "internshipId", in: "path", required: true, schema: { type: "string" }, description: "Internship ID" }],
+        requestBody: { 
+          content: { 
+            "application/json": { 
+              schema: { 
+                type: "object", 
+                properties: { 
+                  comments: { type: "string", description: "Optional approval comments" } 
+                } 
+              } 
+            } 
+          } 
+        },
+        responses: { 
+          200: { description: "Internship approved" },
+          400: { description: "Invalid state transition" },
+          403: { description: "Department mismatch" },
+          404: { description: "Internship not found" }
+        } 
+      } 
+    },
+    "/mentors/internships/{internshipId}/reject": { 
+      post: { 
+        summary: "Reject internship with reasons", 
+        description: "Reject internship (transitions to mentor_rejected status)",
+        tags: ["Mentors", "Internship Approval"], 
+        security: [{ BearerAuth: [] }], 
+        parameters: [{ name: "internshipId", in: "path", required: true, schema: { type: "string" }, description: "Internship ID" }],
+        requestBody: { 
+          required: true,
+          content: { 
+            "application/json": { 
+              schema: { 
+                type: "object", 
+                required: ["reasons"],
+                properties: { 
+                  reasons: { type: "string", description: "Rejection reasons" }
+                } 
+              } 
+            } 
+          } 
+        },
+        responses: { 
+          200: { description: "Internship rejected" },
+          400: { description: "Invalid state transition or missing reasons" },
+          403: { description: "Department mismatch" },
+          404: { description: "Internship not found" }
+        } 
+      } 
+    },
+    
+    // Mentor Student Management Endpoints (Requirements: 8.2, 8.4, 8.5)
+    "/mentors/students/list": { 
+      get: { 
+        summary: "List assigned students with filters", 
+        description: "Get all students assigned to mentor with filtering by internship status, performance, and credit completion",
+        tags: ["Mentors", "Student Management"], 
+        security: [{ BearerAuth: [] }], 
+        parameters: [
+          { name: "page", in: "query", schema: { type: "integer", default: 1 } },
+          { name: "limit", in: "query", schema: { type: "integer", default: 20 } },
+          { name: "sortBy", in: "query", schema: { type: "string", default: "profile.name" } },
+          { name: "sortOrder", in: "query", schema: { type: "string", enum: ["asc", "desc"], default: "asc" } },
+          { name: "internshipStatus", in: "query", schema: { type: "string", enum: ["active", "applied", "none"] }, description: "Filter by internship status" },
+          { name: "performanceLevel", in: "query", schema: { type: "string", enum: ["high", "medium", "low"] }, description: "Filter by performance level" },
+          { name: "creditCompletion", in: "query", schema: { type: "string", enum: ["completed", "in_progress", "not_started"] }, description: "Filter by credit completion" },
+          { name: "search", in: "query", schema: { type: "string" }, description: "Search by name or roll number" }
+        ],
+        responses: { 
+          200: { 
+            description: "List of students",
+            content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, data: { type: "object", properties: { students: { type: "array", items: { $ref: "#/components/schemas/Student" } }, pagination: { $ref: "#/components/schemas/Pagination" } } } } } } }
+          } 
+        } 
+      } 
+    },
+    "/mentors/students/{studentId}/details": { 
+      get: { 
+        summary: "Get student details with internship history", 
+        description: "Get complete student profile including internship history and performance metrics",
+        tags: ["Mentors", "Student Management"], 
+        security: [{ BearerAuth: [] }], 
+        parameters: [{ name: "studentId", in: "path", required: true, schema: { type: "string" }, description: "Student ID" }],
+        responses: { 
+          200: { description: "Student details", content: { "application/json": { schema: { $ref: "#/components/schemas/Student" } } } },
+          404: { description: "Student not found" }
+        } 
+      } 
+    },
+    "/mentors/students/{studentId}/applications": { 
+      get: { 
+        summary: "Get student applications", 
+        description: "Get all applications submitted by a student",
+        tags: ["Mentors", "Student Management"], 
+        security: [{ BearerAuth: [] }], 
+        parameters: [
+          { name: "studentId", in: "path", required: true, schema: { type: "string" }, description: "Student ID" },
+          { name: "status", in: "query", schema: { type: "string" }, description: "Filter by status" },
+          { name: "page", in: "query", schema: { type: "integer", default: 1 } },
+          { name: "limit", in: "query", schema: { type: "integer", default: 20 } }
+        ],
+        responses: { 
+          200: { 
+            description: "List of applications",
+            content: { "application/json": { schema: { type: "array", items: { $ref: "#/components/schemas/Application" } } } }
+          } 
+        } 
+      } 
+    },
+    
+    // Mentor Analytics Endpoints (Requirements: 8.1, 8.3)
+    "/mentors/analytics": { 
+      get: { 
+        summary: "Get mentor-specific analytics", 
+        description: "Get analytics for mentor including approval rates and student supervision metrics",
+        tags: ["Mentors", "Analytics"], 
+        security: [{ BearerAuth: [] }], 
+        parameters: [
+          { name: "dateFrom", in: "query", schema: { type: "string", format: "date" }, description: "Start date for analytics" },
+          { name: "dateTo", in: "query", schema: { type: "string", format: "date" }, description: "End date for analytics" }
+        ],
+        responses: { 200: { description: "Mentor analytics" } } 
+      } 
+    },
+    "/mentors/analytics/department": { 
+      get: { 
+        summary: "Get department analytics", 
+        description: "Get analytics for mentor's department",
+        tags: ["Mentors", "Analytics"], 
+        security: [{ BearerAuth: [] }], 
+        parameters: [
+          { name: "dateFrom", in: "query", schema: { type: "string", format: "date" }, description: "Start date for analytics" },
+          { name: "dateTo", in: "query", schema: { type: "string", format: "date" }, description: "End date for analytics" }
+        ],
+        responses: { 200: { description: "Department analytics" } } 
+      } 
+    },
 
     // Admin Routes
-    "/admins/dashboard": { get: { summary: "Get dashboard", tags: ["Admin"], responses: { 200: { description: "Dashboard" } } } },
-    "/admins/companies/pending": { get: { summary: "Pending companies", tags: ["Admin"], responses: { 200: { description: "List" } } } },
-    "/admins/companies/{companyId}": { get: { summary: "Company details", tags: ["Admin"], parameters: [{ name: "companyId", in: "path", required: true, schema: { type: "string" } }], responses: { 200: { description: "Details" } } } },
-    "/admins/companies/{companyId}/verify": { post: { summary: "Verify company", tags: ["Admin"], parameters: [{ name: "companyId", in: "path", required: true, schema: { type: "string" } }], requestBody: { content: { "application/json": { schema: { type: "object", required: ["comment"], properties: { comment: { type: "string" } } } } } }, responses: { 200: { description: "Verified" } } } },
-    "/admins/companies/{companyId}/reject": { post: { summary: "Reject company", tags: ["Admin"], parameters: [{ name: "companyId", in: "path", required: true, schema: { type: "string" } }], responses: { 200: { description: "Rejected" } } } },
-    "/admins/companies/{companyId}/suspend": { post: { summary: "Suspend company", tags: ["Admin"], parameters: [{ name: "companyId", in: "path", required: true, schema: { type: "string" } }], responses: { 200: { description: "Suspended" } } } },
-    "/admins/students/import": { post: { summary: "Bulk import students", tags: ["Admin"], responses: { 202: { description: "Accepted" } } } },
-    "/admins/students/import/{jobId}": { get: { summary: "Import status", tags: ["Admin"], parameters: [{ name: "jobId", in: "path", required: true, schema: { type: "string" } }], responses: { 200: { description: "Status" } } } },
-    "/admins/mentors/assign": { post: { summary: "Assign mentor", tags: ["Admin"], responses: { 200: { description: "Assigned" } } } },
-    "/admins/credits/process": { post: { summary: "Process credits", tags: ["Admin"], responses: { 202: { description: "Processing" } } } },
-    "/admins/reports/system": { post: { summary: "System report", tags: ["Admin"], responses: { 202: { description: "Generating" } } } },
-    "/admins/analytics/system": { get: { summary: "System analytics", tags: ["Admin"], responses: { 200: { description: "Analytics" } } } },
-    "/admins/analytics/college": { get: { summary: "College analytics", tags: ["Admin"], responses: { 200: { description: "Analytics" } } } },
-    "/admins/system/health": { get: { summary: "System health", tags: ["Admin"], responses: { 200: { description: "Health" } } } },
-    "/admins/ai/usage": { get: { summary: "AI usage", tags: ["Admin"], responses: { 200: { description: "Usage" } } } },
+    "/admins/dashboard": { get: { summary: "Get dashboard", tags: ["Admin"], security: [{ BearerAuth: [] }], responses: { 200: { description: "Dashboard" } } } },
+    "/admins/companies/pending": { get: { summary: "Pending companies", tags: ["Admin"], security: [{ BearerAuth: [] }], responses: { 200: { description: "List" } } } },
+    "/admins/companies/{companyId}": { get: { summary: "Company details", tags: ["Admin"], security: [{ BearerAuth: [] }], parameters: [{ name: "companyId", in: "path", required: true, schema: { type: "string" } }], responses: { 200: { description: "Details" } } } },
+    "/admins/companies/{companyId}/verify": { post: { summary: "Verify company", tags: ["Admin"], security: [{ BearerAuth: [] }], parameters: [{ name: "companyId", in: "path", required: true, schema: { type: "string" } }], requestBody: { content: { "application/json": { schema: { type: "object", required: ["comment"], properties: { comment: { type: "string" } } } } } }, responses: { 200: { description: "Verified" } } } },
+    "/admins/companies/{companyId}/reject": { post: { summary: "Reject company", tags: ["Admin"], security: [{ BearerAuth: [] }], parameters: [{ name: "companyId", in: "path", required: true, schema: { type: "string" } }], responses: { 200: { description: "Rejected" } } } },
+    "/admins/companies/{companyId}/suspend": { post: { summary: "Suspend company", tags: ["Admin"], security: [{ BearerAuth: [] }], parameters: [{ name: "companyId", in: "path", required: true, schema: { type: "string" } }], responses: { 200: { description: "Suspended" } } } },
+    "/admins/students/import": { post: { summary: "Bulk import students", tags: ["Admin"], security: [{ BearerAuth: [] }], responses: { 202: { description: "Accepted" } } } },
+    "/admins/students/import/{jobId}": { get: { summary: "Import status", tags: ["Admin"], security: [{ BearerAuth: [] }], parameters: [{ name: "jobId", in: "path", required: true, schema: { type: "string" } }], responses: { 200: { description: "Status" } } } },
+    "/admins/mentors/assign": { post: { summary: "Assign mentor", tags: ["Admin"], security: [{ BearerAuth: [] }], responses: { 200: { description: "Assigned" } } } },
+    "/admins/credits/process": { post: { summary: "Process credits", tags: ["Admin"], security: [{ BearerAuth: [] }], responses: { 202: { description: "Processing" } } } },
+    "/admins/reports/system": { post: { summary: "System report", tags: ["Admin"], security: [{ BearerAuth: [] }], responses: { 202: { description: "Generating" } } } },
+    "/admins/analytics/system": { get: { summary: "System analytics", tags: ["Admin"], security: [{ BearerAuth: [] }], responses: { 200: { description: "Analytics" } } } },
+    "/admins/analytics/college": { get: { summary: "College analytics", tags: ["Admin"], security: [{ BearerAuth: [] }], responses: { 200: { description: "Analytics" } } } },
+    "/admins/system/health": { get: { summary: "System health", tags: ["Admin"], security: [{ BearerAuth: [] }], responses: { 200: { description: "Health" } } } },
+    "/admins/ai/usage": { get: { summary: "AI usage", tags: ["Admin"], security: [{ BearerAuth: [] }], responses: { 200: { description: "Usage" } } } },
+    
+    // Admin Internship Verification Endpoints (Requirements: 2.2, 2.3)
+    "/admins/internships/pending": { 
+      get: { 
+        summary: "List pending internships for admin verification", 
+        description: "Get all internships awaiting admin verification with filtering and pagination",
+        tags: ["Admin", "Internship Verification"], 
+        security: [{ BearerAuth: [] }], 
+        parameters: [
+          { name: "page", in: "query", schema: { type: "integer", default: 1 }, description: "Page number" },
+          { name: "limit", in: "query", schema: { type: "integer", default: 20 }, description: "Items per page" },
+          { name: "companyId", in: "query", schema: { type: "string" }, description: "Filter by company ID" },
+          { name: "department", in: "query", schema: { type: "string" }, description: "Filter by department" },
+          { name: "sortBy", in: "query", schema: { type: "string", default: "postedAt" }, description: "Sort field" },
+          { name: "sortOrder", in: "query", schema: { type: "string", enum: ["asc", "desc"], default: "desc" }, description: "Sort order" }
+        ],
+        responses: { 
+          200: { 
+            description: "List of pending internships",
+            content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, data: { type: "object", properties: { internships: { type: "array", items: { $ref: "#/components/schemas/Internship" } }, pagination: { $ref: "#/components/schemas/Pagination" } } } } } } }
+          } 
+        } 
+      } 
+    },
+    "/admins/internships/{id}": { 
+      get: { 
+        summary: "Get internship details for verification", 
+        description: "Get complete internship details including company history for admin review",
+        tags: ["Admin", "Internship Verification"], 
+        security: [{ BearerAuth: [] }], 
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" }, description: "Internship ID" }],
+        responses: { 
+          200: { description: "Internship details", content: { "application/json": { schema: { $ref: "#/components/schemas/Internship" } } } },
+          404: { description: "Internship not found" }
+        } 
+      } 
+    },
+    "/admins/internships/{id}/approve": { 
+      post: { 
+        summary: "Approve internship", 
+        description: "Approve internship for mentor review (transitions to admin_approved status)",
+        tags: ["Admin", "Internship Verification"], 
+        security: [{ BearerAuth: [] }], 
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" }, description: "Internship ID" }],
+        requestBody: { 
+          content: { 
+            "application/json": { 
+              schema: { 
+                type: "object", 
+                properties: { 
+                  comments: { type: "string", description: "Optional approval comments" } 
+                } 
+              } 
+            } 
+          } 
+        },
+        responses: { 
+          200: { description: "Internship approved" },
+          400: { description: "Invalid state transition" },
+          404: { description: "Internship not found" }
+        } 
+      } 
+    },
+    "/admins/internships/{id}/reject": { 
+      post: { 
+        summary: "Reject internship", 
+        description: "Reject internship with reasons (transitions to admin_rejected status)",
+        tags: ["Admin", "Internship Verification"], 
+        security: [{ BearerAuth: [] }], 
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" }, description: "Internship ID" }],
+        requestBody: { 
+          required: true,
+          content: { 
+            "application/json": { 
+              schema: { 
+                type: "object", 
+                required: ["reasons"],
+                properties: { 
+                  reasons: { type: "string", description: "Rejection reasons" },
+                  comments: { type: "string", description: "Additional comments" }
+                } 
+              } 
+            } 
+          } 
+        },
+        responses: { 
+          200: { description: "Internship rejected" },
+          400: { description: "Invalid state transition or missing reasons" },
+          404: { description: "Internship not found" }
+        } 
+      } 
+    },
+    
+    // Admin Analytics Endpoints (Requirements: 10.1, 10.2, 10.3, 10.4, 10.5)
+    "/admins/analytics": { 
+      get: { 
+        summary: "Get system-wide analytics", 
+        description: "Get comprehensive system analytics with date range filtering",
+        tags: ["Admin", "Analytics"], 
+        security: [{ BearerAuth: [] }], 
+        parameters: [
+          { name: "dateFrom", in: "query", schema: { type: "string", format: "date" }, description: "Start date for analytics" },
+          { name: "dateTo", in: "query", schema: { type: "string", format: "date" }, description: "End date for analytics" }
+        ],
+        responses: { 200: { description: "System analytics" } } 
+      } 
+    },
+    "/admins/analytics/companies": { 
+      get: { 
+        summary: "Get company performance metrics", 
+        description: "Get performance metrics for all companies with sorting and filtering",
+        tags: ["Admin", "Analytics"], 
+        security: [{ BearerAuth: [] }], 
+        parameters: [
+          { name: "page", in: "query", schema: { type: "integer", default: 1 } },
+          { name: "limit", in: "query", schema: { type: "integer", default: 20 } },
+          { name: "sortBy", in: "query", schema: { type: "string", enum: ["averageRating", "internshipsPosted", "applicationsReceived", "completionRate"] } },
+          { name: "sortOrder", in: "query", schema: { type: "string", enum: ["asc", "desc"], default: "desc" } }
+        ],
+        responses: { 200: { description: "Company performance metrics" } } 
+      } 
+    },
+    "/admins/analytics/departments": { 
+      get: { 
+        summary: "Get department performance", 
+        description: "Get performance metrics by department",
+        tags: ["Admin", "Analytics"], 
+        security: [{ BearerAuth: [] }], 
+        parameters: [
+          { name: "department", in: "query", schema: { type: "string" }, description: "Specific department to analyze" },
+          { name: "dateFrom", in: "query", schema: { type: "string", format: "date" } },
+          { name: "dateTo", in: "query", schema: { type: "string", format: "date" } }
+        ],
+        responses: { 200: { description: "Department performance" } } 
+      } 
+    },
+    "/admins/analytics/mentors": { 
+      get: { 
+        summary: "Get mentor performance", 
+        description: "Get performance metrics for all mentors",
+        tags: ["Admin", "Analytics"], 
+        security: [{ BearerAuth: [] }], 
+        parameters: [
+          { name: "page", in: "query", schema: { type: "integer", default: 1 } },
+          { name: "limit", in: "query", schema: { type: "integer", default: 20 } },
+          { name: "sortBy", in: "query", schema: { type: "string", enum: ["approvalRate", "approvalsProcessed", "averageResponseTime", "studentsSupervised"] } },
+          { name: "sortOrder", in: "query", schema: { type: "string", enum: ["asc", "desc"], default: "desc" } }
+        ],
+        responses: { 200: { description: "Mentor performance metrics" } } 
+      } 
+    },
+    "/admins/analytics/students": { 
+      get: { 
+        summary: "Get student performance", 
+        description: "Get overall student performance metrics",
+        tags: ["Admin", "Analytics"], 
+        security: [{ BearerAuth: [] }], 
+        parameters: [
+          { name: "page", in: "query", schema: { type: "integer", default: 1 } },
+          { name: "limit", in: "query", schema: { type: "integer", default: 20 } }
+        ],
+        responses: { 200: { description: "Student performance metrics" } } 
+      } 
+    },
 
     // Test Routes
     "/tests/email": {

@@ -27,6 +27,12 @@ import {
   getReappealStatus,
   markCompletionComplete,
   getCompletedInternships,
+  approveApplication,
+  rejectApplication,
+  getApplicationDetails,
+  getCompanyAnalytics,
+  exportCompanyAnalytics,
+  getInternshipMetrics,
 } from "../controllers/companyController.js";
 import { authenticate, identifyUser, authorize } from "../middleware/auth.js";
 import { 
@@ -180,12 +186,55 @@ router.post("/internships/:internshipId/complete", companyAuth, asyncHandler(mar
  * @swagger
  * /api/companies/internships/{internshipId}/applicants:
  *   get:
- *     summary: Get applicants for internship
+ *     summary: Get applicants for internship with filters
  *     tags: [Companies]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: internshipId
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: companyFeedbackStatus
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
  */
 router.get("/internships/:internshipId/applicants", companyAuth, asyncHandler(getApplicants));
+
+/**
+ * @swagger
+ * /api/companies/internships/{internshipId}/metrics:
+ *   get:
+ *     summary: Get internship-specific metrics
+ *     tags: [Companies]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: internshipId
+ *         required: true
+ *         schema:
+ *           type: string
+ */
+router.get("/internships/:internshipId/metrics", companyAuth, asyncHandler(getInternshipMetrics));
 
 /**
  * @swagger
@@ -213,12 +262,81 @@ router.post("/applications/shortlist", companyAuth, asyncHandler(shortlistCandid
  * @swagger
  * /api/companies/applications/reject:
  *   post:
- *     summary: Reject candidates
+ *     summary: Reject candidates (bulk)
  *     tags: [Companies]
  *     security:
  *       - bearerAuth: []
  */
 router.post("/applications/reject", companyAuth, asyncHandler(rejectCandidates));
+
+/**
+ * @swagger
+ * /api/companies/applications/approve:
+ *   post:
+ *     summary: Approve application
+ *     tags: [Companies]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - applicationId
+ *             properties:
+ *               applicationId:
+ *                 type: string
+ *               feedback:
+ *                 type: string
+ *               nextSteps:
+ *                 type: string
+ */
+router.post("/applications/approve", companyAuth, asyncHandler(approveApplication));
+
+/**
+ * @swagger
+ * /api/companies/applications/reject-single:
+ *   post:
+ *     summary: Reject application
+ *     tags: [Companies]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - applicationId
+ *             properties:
+ *               applicationId:
+ *                 type: string
+ *               reason:
+ *                 type: string
+ *               feedback:
+ *                 type: string
+ */
+router.post("/applications/reject-single", companyAuth, asyncHandler(rejectApplication));
+
+/**
+ * @swagger
+ * /api/companies/applications/{applicationId}:
+ *   get:
+ *     summary: Get application details
+ *     tags: [Companies]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: applicationId
+ *         required: true
+ *         schema:
+ *           type: string
+ */
+router.get("/applications/:applicationId", companyAuth, asyncHandler(getApplicationDetails));
 
 /**
  * @swagger
@@ -296,6 +414,59 @@ router.post("/events", companyAuth, asyncHandler(createEvent));
  *       - bearerAuth: []
  */
 router.post("/challenges", companyAuth, asyncHandler(createChallenge));
+
+/**
+ * @swagger
+ * /api/companies/analytics:
+ *   get:
+ *     summary: Get company analytics with date range
+ *     tags: [Companies]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: dateFrom
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Start date for analytics period
+ *       - in: query
+ *         name: dateTo
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: End date for analytics period
+ */
+router.get("/analytics", companyAuth, asyncHandler(getCompanyAnalytics));
+
+/**
+ * @swagger
+ * /api/companies/analytics/export:
+ *   get:
+ *     summary: Export analytics report
+ *     tags: [Companies]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: format
+ *         schema:
+ *           type: string
+ *           enum: [csv, pdf]
+ *           default: csv
+ *         description: Export format
+ *       - in: query
+ *         name: dateFrom
+ *         schema:
+ *           type: string
+ *           format: date
+ *       - in: query
+ *         name: dateTo
+ *         schema:
+ *           type: string
+ *           format: date
+ */
+router.get("/analytics/export", companyAuth, asyncHandler(exportCompanyAnalytics));
 
 /**
  * @swagger

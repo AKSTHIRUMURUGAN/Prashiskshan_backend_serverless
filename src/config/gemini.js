@@ -5,7 +5,10 @@ const generativeAI = new GoogleGenerativeAI(config.gemini.apiKey);
 
 // Base models
 export const flashModel = generativeAI.getGenerativeModel({ model: config.gemini.flashModel });
-export const proModel = generativeAI.getGenerativeModel({ model: config.gemini.proModel });
+// proModel defaults to flashModel when GEMINI_MODEL_PRO is not configured
+export const proModel = generativeAI.getGenerativeModel({ 
+  model: config.gemini.proModel || config.gemini.flashModel 
+});
 
 // Specific variants
 export const flashLiteModel = generativeAI.getGenerativeModel({ model: config.gemini.flashLiteModel });

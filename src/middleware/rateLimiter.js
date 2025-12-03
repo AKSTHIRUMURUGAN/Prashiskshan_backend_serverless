@@ -3,6 +3,12 @@ import RedisStore from "rate-limit-redis";
 import redisClient from "../config/redis.js";
 import config from "../config/index.js";
 
+// Helper function to properly handle IPv6 addresses
+const ipKeyGenerator = (req) => {
+  // Use the built-in IP extraction that handles IPv6 properly
+  return req.ip || req.connection?.remoteAddress || 'unknown';
+};
+
 const createRedisStore = () =>
   new RedisStore({
     sendCommand: (...args) => redisClient.call(...args),
@@ -98,5 +104,49 @@ const reappealRateLimiter = rateLimit({
   },
 });
 
-export { generalRateLimiter, authRateLimiter, uploadRateLimiter, reappealRateLimiter };
+// Rate limiter for admin bulk operations
+// Prevents abuse of bulk approval/rejection endpoints
+const adminBulkOperationRateLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') ? 1000 : 10, // 10 bulk operations per minute in production
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: createRedisStore(),
+  message: { 
+    success: false, 
+    error: "TooManyBulkOperations",
+    message: "Too many bulk operations. Please try again later." 
+  },
+  // Use admin ID as key for per-admin rate limiting
+  keyGenerator: (req) => {
+    return req.user?.adminId || req.user?.mongoId?.toString() || ipKeyGenerator(req);
+  },
+});
+
+// Rate limiter for admin analytics endpoints
+// Prevents excessive analytics queries
+const adminAnalyticsRateLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') ? 1000 : 30, // 30 analytics requests per minute in production
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: createRedisStore(),
+  message: { 
+    success: false, 
+    error: "TooManyAnalyticsRequests",
+    message: "Too many analytics requests. Please try again later." 
+  },
+  keyGenerator: (req) => {
+    return req.user?.adminId || req.user?.mongoId?.toString() || ipKeyGenerator(req);
+  },
+});
+
+export { 
+  generalRateLimiter, 
+  authRateLimiter, 
+  uploadRateLimiter, 
+  reappealRateLimiter,
+  adminBulkOperationRateLimiter,
+  adminAnalyticsRateLimiter,
+};
 
