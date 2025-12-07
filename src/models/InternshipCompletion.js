@@ -41,6 +41,17 @@ const companyCompletionSchema = new Schema(
   { _id: false },
 );
 
+const cachedInternshipDataSchema = new Schema(
+  {
+    title: String,
+    department: String,
+    companyName: String,
+    startDate: Date,
+    endDate: Date,
+  },
+  { _id: false },
+);
+
 const completionSchema = new Schema(
   {
     completionId: { type: String, required: true, unique: true, index: true },
@@ -60,6 +71,9 @@ const completionSchema = new Schema(
     
     // Company completion details
     companyCompletion: companyCompletionSchema,
+    
+    // Cached internship data for orphaned reference handling
+    cachedInternshipData: cachedInternshipDataSchema,
   },
   { timestamps: true },
 );

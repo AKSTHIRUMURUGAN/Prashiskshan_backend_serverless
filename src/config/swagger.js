@@ -38,59 +38,177 @@ const options = {
         },
       },
       schemas: {
-        Error: {
+        // Common Response Schemas
+        SuccessResponse: {
           type: "object",
-          properties: {
-            success: {
-              type: "boolean",
-              example: false,
-            },
-            error: {
-              type: "string",
-              example: "Error message",
-            },
-            details: {
-              type: "object",
-            },
-          },
-        },
-        Success: {
-          type: "object",
+          required: ["success", "message"],
           properties: {
             success: {
               type: "boolean",
               example: true,
+              description: "Indicates if the request was successful",
             },
             message: {
               type: "string",
-              example: "Operation successful",
+              example: "Operation completed successfully",
+              description: "Human-readable success message",
             },
             data: {
               type: "object",
+              description: "Response payload containing the requested data",
             },
           },
+          description: "Standard success response format",
+        },
+        Error: {
+          type: "object",
+          required: ["success", "message"],
+          properties: {
+            success: {
+              type: "boolean",
+              example: false,
+              description: "Always false for error responses",
+            },
+            message: {
+              type: "string",
+              example: "An error occurred",
+              description: "Human-readable error message",
+            },
+            error: {
+              type: "object",
+              properties: {
+                code: {
+                  type: "string",
+                  example: "VALIDATION_ERROR",
+                  description: "Machine-readable error code",
+                },
+                details: {
+                  type: "object",
+                  description: "Additional error details and context",
+                },
+              },
+            },
+            requestId: {
+              type: "string",
+              example: "req_1234567890",
+              description: "Unique request identifier for debugging",
+            },
+          },
+          description: "Standard error response format",
         },
         Pagination: {
           type: "object",
+          required: ["currentPage", "totalPages", "totalItems", "itemsPerPage"],
           properties: {
-            page: {
+            currentPage: {
               type: "integer",
               example: 1,
+              minimum: 1,
+              description: "Current page number",
             },
-            limit: {
+            totalPages: {
               type: "integer",
               example: 10,
+              minimum: 0,
+              description: "Total number of pages",
             },
-            total: {
+            totalItems: {
               type: "integer",
-              example: 100,
+              example: 95,
+              minimum: 0,
+              description: "Total number of items across all pages",
             },
-            pages: {
+            itemsPerPage: {
               type: "integer",
               example: 10,
+              minimum: 1,
+              description: "Number of items per page",
+            },
+            hasNextPage: {
+              type: "boolean",
+              example: true,
+              description: "Whether there is a next page",
+            },
+            hasPrevPage: {
+              type: "boolean",
+              example: false,
+              description: "Whether there is a previous page",
             },
           },
+          description: "Pagination metadata for list responses",
         },
+
+        // Status Enum Schemas
+        InternshipStatus: {
+          type: "string",
+          enum: [
+            "draft",
+            "pending_admin_verification",
+            "admin_approved",
+            "admin_rejected",
+            "mentor_rejected",
+            "open_for_applications",
+            "closed",
+            "cancelled",
+          ],
+          description:
+            "Internship lifecycle status. Flow: draft → pending_admin_verification → admin_approved → open_for_applications → closed. Rejection paths: admin_rejected, mentor_rejected",
+        },
+        ApplicationStatus: {
+          type: "string",
+          enum: [
+            "pending",
+            "mentor_approved",
+            "shortlisted",
+            "accepted",
+            "rejected",
+            "withdrawn",
+          ],
+          description:
+            "Application workflow status. Flow: pending → mentor_approved → shortlisted → accepted/rejected. Students can withdraw at any time.",
+        },
+        CreditRequestStatus: {
+          type: "string",
+          enum: [
+            "pending",
+            "mentor_reviewing",
+            "mentor_approved",
+            "mentor_rejected",
+            "admin_reviewing",
+            "admin_approved",
+            "admin_rejected",
+            "completed",
+          ],
+          description:
+            "Credit transfer workflow status. Flow: pending → mentor_reviewing → mentor_approved → admin_reviewing → admin_approved → completed. Rejection paths: mentor_rejected, admin_rejected",
+        },
+        LogbookStatus: {
+          type: "string",
+          enum: [
+            "submitted",
+            "mentor_reviewing",
+            "company_reviewing",
+            "approved",
+            "revision_requested",
+            "rejected",
+          ],
+          description:
+            "Logbook review workflow status. Flow: submitted → mentor_reviewing → approved. Mentor can request revision.",
+        },
+        CompanyVerificationStatus: {
+          type: "string",
+          enum: [
+            "pending_verification",
+            "verified",
+            "rejected",
+            "suspended",
+            "blocked",
+          ],
+          description:
+            "Company verification workflow status. Flow: pending_verification → verified. Admin can suspend or block verified companies.",
+        },
+
+        // Entity Schemas
         Student: {
           type: "object",
           properties: {

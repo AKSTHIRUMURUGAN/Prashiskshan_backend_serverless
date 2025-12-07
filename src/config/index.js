@@ -76,6 +76,7 @@ const config = {
       ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n")
       : "-----BEGIN PRIVATE KEY-----\nMOCK_KEY_FOR_TESTING\n-----END PRIVATE KEY-----\n",
     clientEmail: process.env.FIREBASE_CLIENT_EMAIL || "test@test-project.iam.gserviceaccount.com",
+    webApiKey: process.env.FIREBASE_WEB_API_KEY,
   },
   gemini: {
     apiKey: process.env.GEMINI_API_KEY,
@@ -144,6 +145,9 @@ const config = {
     interviewDaily: number(process.env.AI_INTERVIEW_DAILY_LIMIT, 20),
     chatbotDaily: number(process.env.AI_CHATBOT_DAILY_LIMIT, 50),
     summaryDaily: number(process.env.AI_SUMMARY_DAILY_LIMIT, 10),
+  },
+  storage: {
+    defaultProvider: process.env.STORAGE_DEFAULT_PROVIDER || "s3",
   },
 };
 

@@ -348,6 +348,11 @@ class InternshipService {
     try {
       const query = { status };
 
+      // Default filter: exclude deleted internships unless explicitly requested
+      if (!filters.includeDeleted) {
+        query.isDeleted = { $ne: true };
+      }
+
       // Apply additional filters
       if (filters.department) {
         query.department = filters.department;
@@ -421,6 +426,9 @@ class InternshipService {
         status: "admin_approved",
         department,
       };
+
+      // Default filter: exclude deleted internships
+      query.isDeleted = { $ne: true };
 
       // Apply additional filters
       if (filters.search) {
@@ -506,6 +514,8 @@ class InternshipService {
             "departmentApprovals.department": department,
           }
         ],
+        // Default filter: exclude deleted internships
+        isDeleted: { $ne: true },
         // TODO: Re-enable deadline filter for production
         // Show internships with deadlines that haven't passed yet (end of day)
         // applicationDeadline: { 
@@ -649,9 +659,11 @@ class InternshipService {
       const now = new Date();
 
       // Find internships that are open but past their deadline
+      // Exclude deleted internships
       const expiredInternships = await Internship.find({
         status: "open_for_applications",
         applicationDeadline: { $lt: now },
+        isDeleted: { $ne: true },
       });
 
       logger.info("Found expired internships", {

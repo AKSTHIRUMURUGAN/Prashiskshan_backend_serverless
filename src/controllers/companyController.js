@@ -11,6 +11,7 @@ import { logger } from "../utils/logger.js";
 import { internshipService } from "../services/internshipService.js";
 import { applicationService } from "../services/applicationService.js";
 import { internshipAnalyticsService } from "../services/internshipAnalyticsService.js";
+import { softDeleteInternship } from "./helpers/orphanedReferences.js";
 
 /**
  * Extract storage key from R2 public URL
@@ -176,24 +177,10 @@ export const deleteInternship = async (req, res, next) => {
     // Verify ownership
     const internship = await ensureInternshipOwnership(company._id, internshipId);
     
-    // Update status to cancelled
-    internship.status = "cancelled";
-    internship.closedAt = new Date();
+    // Perform soft delete
+    await softDeleteInternship(internship._id, company.companyId, "company");
     
-    // Add audit trail entry
-    internship.auditTrail.push({
-      timestamp: new Date(),
-      actor: company.companyId,
-      actorRole: "company",
-      action: "cancel_internship",
-      fromStatus: internship.status,
-      toStatus: "cancelled",
-      reason: "Internship cancelled by company",
-    });
-    
-    await internship.save();
-    
-    res.status(204).send();
+    res.json(apiSuccess(null, "Internship deleted successfully"));
   } catch (error) {
     next(error);
   }
@@ -226,7 +213,10 @@ export const getCompanyInternships = async (req, res, next) => {
       result = await internshipService.getInternshipsByStatus(req.query.status, filters);
     } else {
       // Get all internships for this company
-      const query = { companyId: company._id };
+      const query = { 
+        companyId: company._id,
+        isDeleted: { $ne: true },
+      };
       
       if (filters.search) {
         query.$text = { $search: filters.search };
@@ -511,7 +501,11 @@ export const getApplicationDetails = async (req, res, next) => {
 export const getInternsProgress = async (req, res, next) => {
   try {
     const company = await ensureCompanyContext(req);
-    const internships = await Internship.find({ companyId: company._id, status: "approved" }).select("_id title").lean();
+    const internships = await Internship.find({ 
+      companyId: company._id, 
+      status: "approved",
+      isDeleted: { $ne: true },
+    }).select("_id title").lean();
     const internshipIds = internships.map((i) => i._id);
     const logbooks = await Logbook.find({ internshipId: { $in: internshipIds }, status: "approved" })
       .populate("studentId")
@@ -756,7 +750,7 @@ export const completeInternship = async (req, res, next) => {
         companyScore: overallScore,
         overallComments: feedback,
       },
-      status: 'pending' // Pending admin/system verification if needed
+      status: 'completed' // Mark as completed so it appears in student's completed internships list
     });
 
     // Update application status

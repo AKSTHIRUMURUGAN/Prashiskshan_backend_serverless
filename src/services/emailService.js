@@ -24,8 +24,11 @@ const sendViaBrevo = async ({ to, subject, html, text }) => {
     to: [{ email: to }],
     subject,
     htmlContent: html,
-    textContent: text,
+    textContent: text || html?.replace(/<[^>]+>/g, "") || "",
   };
+  
+  logger.info("Sending email via Brevo", { to, subject, from: config.email.brevo.fromEmail });
+  
   const res = await fetch("https://api.brevo.com/v3/smtp/email", {
     method: "POST",
     headers: {
@@ -34,10 +37,17 @@ const sendViaBrevo = async ({ to, subject, html, text }) => {
     },
     body: JSON.stringify(payload),
   });
+  
   if (!res.ok) {
     const body = await res.text();
+    logger.error("Brevo API error", { status: res.status, body, to, subject });
     throw new Error(`Brevo error ${res.status}: ${body}`);
   }
+  
+  const responseBody = await res.json();
+  logger.info("Brevo email sent successfully", { messageId: responseBody.messageId, to });
+  
+  return responseBody;
 };
 
 const providers = [
@@ -86,17 +96,32 @@ export const emailService = {
       return { mocked: true };
     }
 
+    const errors = [];
     for (const provider of activeProviders) {
       try {
         await provider.send(payload);
-        logger.info("Email sent", { provider: provider.name, to: payload.to });
+        logger.info("Email sent successfully", { 
+          provider: provider.name, 
+          to: payload.to,
+          subject: payload.subject 
+        });
         return { provider: provider.name };
       } catch (error) {
-        logger.error("Email provider failed", { provider: provider.name, error: error.message });
+        const errorMsg = error.message || error.toString();
+        logger.error("Email provider failed", { 
+          provider: provider.name, 
+          to: payload.to,
+          subject: payload.subject,
+          error: errorMsg,
+          stack: error.stack 
+        });
+        errors.push(`${provider.name}: ${errorMsg}`);
       }
     }
 
-    throw new Error("All email providers failed");
+    const errorMessage = `All email providers failed: ${errors.join("; ")}`;
+    logger.error("All email providers failed", { errors, to: payload.to });
+    throw new Error(errorMessage);
   },
 
   async sendEmailVia(providerName, options) {

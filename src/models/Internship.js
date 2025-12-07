@@ -122,6 +122,10 @@ const internshipSchema = new Schema(
     postedBy: { type: String, required: true },
     postedAt: Date,
     closedAt: Date,
+    // Soft delete fields
+    isDeleted: { type: Boolean, default: false, index: true },
+    deletedAt: Date,
+    deletedBy: { type: Schema.Types.ObjectId, ref: "User" },
   },
   { timestamps: true },
 );

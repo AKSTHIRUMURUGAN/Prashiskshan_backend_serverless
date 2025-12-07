@@ -53,13 +53,51 @@ export const getStudentProfile = async (req, res, next) => {
       Application.countDocuments({ studentId: student._id }),
     ]);
 
+    // Import helpers for handling orphaned references
+    const { handleOrphanedInternship, logOrphanedReferences } = await import("./helpers/orphanedReferences.js");
+    
+    // Track orphaned references in completions
+    const orphanedReferences = [];
+    const processedCompletions = completions.map(completion => {
+      if (!completion.internshipId) {
+        orphanedReferences.push({
+          recordId: completion._id,
+          customId: completion.completionId,
+          completionId: completion.completionId,
+          completionMongoId: completion._id,
+          internshipIdRef: completion.internshipId
+        });
+        
+        const orphanedData = handleOrphanedInternship(completion, 'completion');
+        return {
+          ...completion,
+          internshipId: orphanedData,
+          isInternshipOrphaned: true
+        };
+      }
+      
+      return {
+        ...completion,
+        isInternshipOrphaned: false
+      };
+    });
+    
+    // Log orphaned references if any
+    logOrphanedReferences({
+      collection: "InternshipCompletion",
+      operation: "getStudentProfile",
+      userId: student._id.toString(),
+      studentId: student.studentId,
+      orphanedReferences
+    });
+
     // Calculate total credits earned
     const totalCreditsEarned = creditRequests
       .filter(cr => cr.status === "approved")
       .reduce((sum, cr) => sum + (cr.creditsRequested || 0), 0);
 
     // Get internship history
-    const internshipHistory = completions.map(completion => ({
+    const internshipHistory = processedCompletions.map(completion => ({
       internshipId: completion.internshipId?.internshipId,
       title: completion.internshipId?.title,
       company: completion.companyId?.companyName,
@@ -68,6 +106,7 @@ export const getStudentProfile = async (req, res, next) => {
       hoursWorked: completion.hoursWorked,
       evaluationScore: completion.evaluationScore,
       creditsEarned: completion.creditsEarned,
+      isInternshipOrphaned: completion.isInternshipOrphaned
     }));
 
     const profile = {
@@ -142,6 +181,43 @@ export const getStudentDashboard = async (req, res, next) => {
         .lean(),
     ]);
 
+    // Import helpers for handling orphaned references
+    const { handleOrphanedInternship, logOrphanedReferences } = await import("./helpers/orphanedReferences.js");
+    
+    // Track orphaned references in active internships
+    const orphanedReferences = [];
+    const processedActiveInternships = activeInternships.map(app => {
+      if (!app.internshipId) {
+        orphanedReferences.push({
+          recordId: app._id,
+          customId: app.applicationId,
+          applicationId: app.applicationId,
+          applicationMongoId: app._id,
+          internshipIdRef: app.internshipId
+        });
+        
+        return {
+          ...app,
+          internshipId: handleOrphanedInternship(app, 'application'),
+          isInternshipOrphaned: true
+        };
+      }
+      
+      return {
+        ...app,
+        isInternshipOrphaned: false
+      };
+    });
+    
+    // Log orphaned references if any
+    logOrphanedReferences({
+      collection: "Application",
+      operation: "getStudentDashboard",
+      userId: student._id.toString(),
+      studentId: student.studentId,
+      orphanedReferences
+    });
+
     const pendingLogbooks = logbooks.filter((lb) => lb.status === "draft" || lb.status === "submitted").length;
 
     const stats = applications.reduce(
@@ -169,7 +245,7 @@ export const getStudentDashboard = async (req, res, next) => {
       mentorInfo,
       stats,
       credits: student.credits,
-      activeInternships,
+      activeInternships: processedActiveInternships,
       logbooks: logbooks.slice(-3),
       notifications,
       recommendations: recommended.slice(0, 5),
@@ -439,13 +515,60 @@ export const getMyApplications = async (req, res, next) => {
     // Get applications using the application service
     const result = await applicationService.getApplicationsByStudent(student._id, filters);
 
+    // Import helpers for handling orphaned references
+    const { handleOrphanedInternship, logOrphanedReferences } = await import("./helpers/orphanedReferences.js");
+    
     // Import InternshipCompletion to check credit request availability
     const InternshipCompletion = (await import("../models/InternshipCompletion.js")).default;
     
-    // Get completion records for all applications
+    // Track orphaned references for logging
+    const orphanedReferences = [];
+    
+    // Handle orphaned internship references
+    const applicationsWithOrphanedCheck = result.applications.map(app => {
+      // Check if internship populate returned null
+      if (!app.internshipId) {
+        orphanedReferences.push({
+          recordId: app._id,
+          customId: app.applicationId,
+          applicationId: app.applicationId,
+          applicationMongoId: app._id,
+          internshipIdRef: app.internshipId // This will be the ObjectId that failed to populate
+        });
+        
+        // Use helper to get orphaned internship data
+        const orphanedData = handleOrphanedInternship(app, 'application');
+        
+        return {
+          ...app,
+          internshipId: orphanedData,
+          isInternshipOrphaned: true
+        };
+      }
+      
+      return {
+        ...app,
+        isInternshipOrphaned: false
+      };
+    });
+    
+    // Log warnings for orphaned references using dedicated logger
+    logOrphanedReferences({
+      collection: "Application",
+      operation: "getMyApplications",
+      userId: student._id.toString(),
+      studentId: student.studentId,
+      orphanedReferences
+    });
+    
+    // Get completion records for all applications (only for non-orphaned internships)
+    const validInternshipIds = applicationsWithOrphanedCheck
+      .filter(app => !app.isInternshipOrphaned && app.internshipId?._id)
+      .map(app => app.internshipId._id);
+    
     const completions = await InternshipCompletion.find({
       studentId: student._id,
-      internshipId: { $in: result.applications.map(app => app.internshipId?._id).filter(Boolean) }
+      internshipId: { $in: validInternshipIds }
     }).lean();
     
     // Create a map of internshipId to completion data
@@ -461,7 +584,7 @@ export const getMyApplications = async (req, res, next) => {
     });
     
     // Enhance applications with credit request availability
-    const enhancedApplications = result.applications.map(app => {
+    const enhancedApplications = applicationsWithOrphanedCheck.map(app => {
       const internshipId = app.internshipId?._id?.toString();
       const completionData = completionMap.get(internshipId) || {
         isCompleted: false,
@@ -518,6 +641,33 @@ export const getApplicationDetails = async (req, res, next) => {
       throw createHttpError(404, "Application not found");
     }
 
+    // Import helpers for handling orphaned references
+    const { handleOrphanedInternship, logOrphanedReferences } = await import("./helpers/orphanedReferences.js");
+    
+    // Handle orphaned internship reference
+    let isInternshipOrphaned = false;
+    if (!application.internshipId) {
+      isInternshipOrphaned = true;
+      
+      // Log the orphaned reference
+      logOrphanedReferences({
+        collection: "Application",
+        operation: "getApplicationDetail",
+        userId: student._id.toString(),
+        studentId: student.studentId,
+        orphanedReferences: [{
+          recordId: application._id,
+          customId: application.applicationId,
+          applicationId: application.applicationId,
+          applicationMongoId: application._id,
+          internshipIdRef: application.internshipId
+        }]
+      });
+      
+      // Use helper to get orphaned internship data
+      application.internshipId = handleOrphanedInternship(application, 'application');
+    }
+
     // Check credit request availability
     const InternshipCompletion = (await import("../models/InternshipCompletion.js")).default;
     const completion = await InternshipCompletion.findOne({
@@ -544,6 +694,7 @@ export const getApplicationDetails = async (req, res, next) => {
         {
           application: {
             ...application,
+            isInternshipOrphaned,
             creditRequest
           }
         },
@@ -896,6 +1047,14 @@ export const getCompletedInternshipsWithCreditStatus = async (req, res, next) =>
       status: 'completed'
     };
     
+    logger.info('Fetching completed internships', {
+      studentId: student._id,
+      studentCustomId: student.studentId,
+      query,
+      page,
+      limit
+    });
+    
     const [completions, total] = await Promise.all([
       InternshipCompletion.find(query)
         .populate('internshipId')
@@ -907,14 +1066,77 @@ export const getCompletedInternshipsWithCreditStatus = async (req, res, next) =>
       InternshipCompletion.countDocuments(query)
     ]);
     
-    // Enhance with credit request availability
-    const enhancedCompletions = completions.map(completion => ({
-      ...completion,
-      creditRequestAvailable: !completion.creditRequest?.requested,
-      canRequestCredit: !completion.creditRequest?.requested,
-      creditRequestStatus: completion.creditRequest?.status || null,
-      creditRequestId: completion.creditRequest?.requestId || null
-    }));
+    logger.info('Completions fetched', {
+      count: completions.length,
+      total,
+      completionIds: completions.map(c => c.completionId)
+    });
+    
+    // Import helpers for handling orphaned references
+    const { handleOrphanedInternship, logOrphanedReferences } = await import("./helpers/orphanedReferences.js");
+    
+    // Track orphaned references for logging
+    const orphanedReferences = [];
+    
+    // Handle orphaned internship references and enhance with credit request availability
+    const enhancedCompletions = completions.map(completion => {
+      let internshipData;
+      let isOrphaned = false;
+      
+      // Check if internship populate returned null
+      if (!completion.internshipId) {
+        orphanedReferences.push({
+          recordId: completion._id,
+          customId: completion.completionId,
+          completionId: completion.completionId,
+          completionMongoId: completion._id,
+          internshipIdRef: completion.internshipId // This will be the ObjectId that failed to populate
+        });
+        
+        // Use helper to get orphaned internship data
+        internshipData = handleOrphanedInternship(completion, 'completion');
+        isOrphaned = true;
+      } else {
+        internshipData = completion.internshipId;
+      }
+      
+      // Transform to match frontend CompletedInternship interface
+      return {
+        _id: completion._id,
+        completionId: completion.completionId,
+        internshipCompletionId: completion.completionId,
+        studentId: completion.studentId,
+        internshipId: internshipData,
+        companyId: completion.companyId,
+        internshipTitle: isOrphaned ? internshipData.title : internshipData.title,
+        department: isOrphaned ? internshipData.department : internshipData.department,
+        companyName: isOrphaned ? internshipData.companyName : (completion.companyId?.companyName || 'Unknown'),
+        totalHours: completion.totalHours,
+        creditsEarned: completion.creditsEarned,
+        completionDate: completion.completionDate,
+        status: completion.status,
+        evaluation: completion.evaluation,
+        certificates: completion.certificates,
+        aiSummary: completion.aiSummary,
+        isInternshipOrphaned: isOrphaned,
+        creditRequest: completion.creditRequest,
+        creditRequestAvailable: !completion.creditRequest?.requested,
+        canRequestCredit: !completion.creditRequest?.requested,
+        creditRequestStatus: completion.creditRequest?.status || null,
+        creditRequestId: completion.creditRequest?.requestId || null,
+        companyCompletion: completion.companyCompletion,
+        cachedInternshipData: completion.cachedInternshipData
+      };
+    });
+    
+    // Log warnings for orphaned references using dedicated logger
+    logOrphanedReferences({
+      collection: "InternshipCompletion",
+      operation: "getCompletedInternshipsWithCreditStatus",
+      userId: student._id.toString(),
+      studentId: student.studentId,
+      orphanedReferences
+    });
     
     res.json(
       apiSuccess(

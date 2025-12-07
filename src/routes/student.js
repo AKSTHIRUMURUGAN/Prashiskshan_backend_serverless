@@ -145,6 +145,17 @@ router.get("/internships/recommended", studentAuth, asyncHandler(getRecommendedI
 
 /**
  * @swagger
+ * /api/students/internships/completed:
+ *   get:
+ *     summary: Get completed internships with credit request availability
+ *     tags: [Students]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get("/internships/completed", studentAuth, asyncHandler(getCompletedInternshipsWithCreditStatus));
+
+/**
+ * @swagger
  * /api/students/internships/{internshipId}:
  *   get:
  *     summary: Get internship details with match analysis
@@ -378,17 +389,6 @@ router.post("/reports/nep", studentAuth, asyncHandler(generateNEPReport));
  *       - bearerAuth: []
  */
 router.post("/chatbot", studentAuth, aiFeatureLimit("chatbot"), asyncHandler(chatbotQuery));
-
-/**
- * @swagger
- * /api/students/internships/completed:
- *   get:
- *     summary: Get completed internships with credit request availability
- *     tags: [Students]
- *     security:
- *       - bearerAuth: []
- */
-router.get("/internships/completed", studentAuth, asyncHandler(getCompletedInternshipsWithCreditStatus));
 
 /**
  * @swagger

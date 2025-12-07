@@ -33,58 +33,177 @@
       }
     },
     "schemas": {
-      "Error": {
+      "SuccessResponse": {
         "type": "object",
+        "required": [
+          "success",
+          "message"
+        ],
         "properties": {
           "success": {
             "type": "boolean",
-            "example": false
-          },
-          "error": {
-            "type": "string",
-            "example": "Error message"
-          },
-          "details": {
-            "type": "object"
-          }
-        }
-      },
-      "Success": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean",
-            "example": true
+            "example": true,
+            "description": "Indicates if the request was successful"
           },
           "message": {
             "type": "string",
-            "example": "Operation successful"
+            "example": "Operation completed successfully",
+            "description": "Human-readable success message"
           },
           "data": {
-            "type": "object"
+            "type": "object",
+            "description": "Response payload containing the requested data"
           }
-        }
+        },
+        "description": "Standard success response format"
+      },
+      "Error": {
+        "type": "object",
+        "required": [
+          "success",
+          "message"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": false,
+            "description": "Always false for error responses"
+          },
+          "message": {
+            "type": "string",
+            "example": "An error occurred",
+            "description": "Human-readable error message"
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "example": "VALIDATION_ERROR",
+                "description": "Machine-readable error code"
+              },
+              "details": {
+                "type": "object",
+                "description": "Additional error details and context"
+              }
+            }
+          },
+          "requestId": {
+            "type": "string",
+            "example": "req_1234567890",
+            "description": "Unique request identifier for debugging"
+          }
+        },
+        "description": "Standard error response format"
       },
       "Pagination": {
         "type": "object",
+        "required": [
+          "currentPage",
+          "totalPages",
+          "totalItems",
+          "itemsPerPage"
+        ],
         "properties": {
-          "page": {
+          "currentPage": {
             "type": "integer",
-            "example": 1
+            "example": 1,
+            "minimum": 1,
+            "description": "Current page number"
           },
-          "limit": {
+          "totalPages": {
             "type": "integer",
-            "example": 10
+            "example": 10,
+            "minimum": 0,
+            "description": "Total number of pages"
           },
-          "total": {
+          "totalItems": {
             "type": "integer",
-            "example": 100
+            "example": 95,
+            "minimum": 0,
+            "description": "Total number of items across all pages"
           },
-          "pages": {
+          "itemsPerPage": {
             "type": "integer",
-            "example": 10
+            "example": 10,
+            "minimum": 1,
+            "description": "Number of items per page"
+          },
+          "hasNextPage": {
+            "type": "boolean",
+            "example": true,
+            "description": "Whether there is a next page"
+          },
+          "hasPrevPage": {
+            "type": "boolean",
+            "example": false,
+            "description": "Whether there is a previous page"
           }
-        }
+        },
+        "description": "Pagination metadata for list responses"
+      },
+      "InternshipStatus": {
+        "type": "string",
+        "enum": [
+          "draft",
+          "pending_admin_verification",
+          "admin_approved",
+          "admin_rejected",
+          "mentor_rejected",
+          "open_for_applications",
+          "closed",
+          "cancelled"
+        ],
+        "description": "Internship lifecycle status. Flow: draft → pending_admin_verification → admin_approved → open_for_applications → closed. Rejection paths: admin_rejected, mentor_rejected"
+      },
+      "ApplicationStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "mentor_approved",
+          "shortlisted",
+          "accepted",
+          "rejected",
+          "withdrawn"
+        ],
+        "description": "Application workflow status. Flow: pending → mentor_approved → shortlisted → accepted/rejected. Students can withdraw at any time."
+      },
+      "CreditRequestStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "mentor_reviewing",
+          "mentor_approved",
+          "mentor_rejected",
+          "admin_reviewing",
+          "admin_approved",
+          "admin_rejected",
+          "completed"
+        ],
+        "description": "Credit transfer workflow status. Flow: pending → mentor_reviewing → mentor_approved → admin_reviewing → admin_approved → completed. Rejection paths: mentor_rejected, admin_rejected"
+      },
+      "LogbookStatus": {
+        "type": "string",
+        "enum": [
+          "submitted",
+          "mentor_reviewing",
+          "company_reviewing",
+          "approved",
+          "revision_requested",
+          "rejected"
+        ],
+        "description": "Logbook review workflow status. Flow: submitted → mentor_reviewing → approved. Mentor can request revision."
+      },
+      "CompanyVerificationStatus": {
+        "type": "string",
+        "enum": [
+          "pending_verification",
+          "verified",
+          "rejected",
+          "suspended",
+          "blocked"
+        ],
+        "description": "Company verification workflow status. Flow: pending_verification → verified. Admin can suspend or block verified companies."
       },
       "Student": {
         "type": "object",
@@ -740,7 +859,19 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Retrieve admin dashboard with system-wide statistics",
+        "responses": {
+          "200": {
+            "description": "Dashboard data retrieved successfully"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden - Admins only"
+          }
+        }
       }
     },
     "/api/admins/companies/pending": {
@@ -753,7 +884,31 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Retrieve all companies pending verification",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pending companies retrieved successfully"
+          }
+        }
       }
     },
     "/api/admins/companies": {
@@ -779,7 +934,26 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Retrieve detailed information about a specific company",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "companyId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Company details retrieved successfully"
+          },
+          "404": {
+            "description": "Company not found"
+          }
+        }
       }
     },
     "/api/admins/companies/{companyId}/verify": {
@@ -792,7 +966,38 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Verify and approve a company registration",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "companyId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "comments": {
+                    "type": "string",
+                    "example": "All documents verified"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Company verified successfully"
+          }
+        }
       }
     },
     "/api/admins/companies/{companyId}/reject": {
@@ -805,7 +1010,42 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Reject a company registration",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "companyId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "reason"
+                ],
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "example": "Invalid documents"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Company rejected successfully"
+          }
+        }
       }
     },
     "/api/admins/companies/:companyId/block": {
@@ -831,7 +1071,38 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Suspend a company account",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "companyId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "example": "Violation of terms"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Company suspended successfully"
+          }
+        }
       }
     },
     "/api/admins/students/import": {
@@ -844,7 +1115,78 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Import multiple students from CSV or JSON",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "students"
+                ],
+                "properties": {
+                  "students": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "email",
+                        "profile"
+                      ],
+                      "properties": {
+                        "email": {
+                          "type": "string",
+                          "format": "email"
+                        },
+                        "profile": {
+                          "type": "object",
+                          "required": [
+                            "name",
+                            "department",
+                            "year",
+                            "college"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Import job queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "jobId": {
+                              "type": "string",
+                              "description": "Job ID for tracking import progress"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/admins/students/import/{jobId}": {
@@ -857,7 +1199,26 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Check the status of a bulk student import job",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "jobId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Import job status retrieved successfully"
+          },
+          "404": {
+            "description": "Job not found"
+          }
+        }
       }
     },
     "/api/admins/mentors/assign": {
@@ -870,7 +1231,43 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Assign a mentor to one or more students",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "mentorId",
+                  "studentIds"
+                ],
+                "properties": {
+                  "mentorId": {
+                    "type": "string",
+                    "example": "MEN-2024001"
+                  },
+                  "studentIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "example": [
+                      "STD-2024001",
+                      "STD-2024002"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Mentor assigned successfully"
+          }
+        }
       }
     },
     "/api/admins/credit-requests/pending": {
@@ -1026,7 +1423,64 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Generate a comprehensive system-wide report",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "startDate": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "endDate": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "reportType": {
+                    "type": "string",
+                    "enum": [
+                      "summary",
+                      "detailed",
+                      "analytics"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Report generation queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "jobId": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/admins/analytics/system": {
@@ -1039,7 +1493,13 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Retrieve system-wide analytics and metrics",
+        "responses": {
+          "200": {
+            "description": "Analytics retrieved successfully"
+          }
+        }
       }
     },
     "/api/admins/analytics/college": {
@@ -1052,7 +1512,23 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Retrieve analytics for specific colleges or all colleges",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "college",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by college name"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "College analytics retrieved successfully"
+          }
+        }
       }
     },
     "/api/admins/system/health": {
@@ -1065,7 +1541,13 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Check system health status including database, Redis, and external services",
+        "responses": {
+          "200": {
+            "description": "System health status retrieved successfully"
+          }
+        }
       }
     },
     "/api/admins/ai/usage": {
@@ -1078,7 +1560,13 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Retrieve statistics on AI feature usage (interviews, chatbot, summaries)",
+        "responses": {
+          "200": {
+            "description": "AI usage statistics retrieved successfully"
+          }
+        }
       }
     },
     "/api/admins/internships/{internshipId}/approve": {
@@ -1112,6 +1600,58 @@
         "summary": "Get internships (filter by status)",
         "tags": [
           "Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/admins/internships/list": {
+      "get": {
+        "summary": "List internships with filtering and pagination",
+        "tags": [
+          "Admin - Internship Management"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/admins/internships/bulk-approve": {
+      "post": {
+        "summary": "Bulk approve internships",
+        "tags": [
+          "Admin - Internship Management"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/admins/internships/bulk-reject": {
+      "post": {
+        "summary": "Bulk reject internships",
+        "tags": [
+          "Admin - Internship Management"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/admins/internships/analytics": {
+      "get": {
+        "summary": "Get internship analytics",
+        "tags": [
+          "Admin - Internship Management"
         ],
         "security": [
           {
@@ -1509,6 +2049,71 @@
         ]
       }
     },
+    "/api/admins/internships/:id/details": {
+      "get": {
+        "summary": "Get detailed internship information",
+        "tags": [
+          "Admin - Internship Management"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/admins/internships/:id/approve-posting": {
+      "post": {
+        "summary": "Approve an internship posting",
+        "tags": [
+          "Admin - Internship Management"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/admins/internships/:id/reject-posting": {
+      "post": {
+        "summary": "Reject an internship posting",
+        "tags": [
+          "Admin - Internship Management"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/admins/internships/:id/edit": {
+      "patch": {
+        "summary": "Edit internship details (legacy route)",
+        "tags": [
+          "Admin - Internship Management"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/admins/internships/:id": {
+      "patch": {
+        "summary": "Update internship details",
+        "tags": [
+          "Admin - Internship Management"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
     "/api/applications/{id}/status": {
       "patch": {
         "summary": "Update application status",
@@ -1562,7 +2167,172 @@
         "description": "Create a new student account with Firebase authentication",
         "tags": [
           "Authentication"
-        ]
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email",
+                  "password",
+                  "profile"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "example": "student@university.edu"
+                  },
+                  "password": {
+                    "type": "string",
+                    "format": "password",
+                    "minLength": 8,
+                    "example": "SecurePass123!"
+                  },
+                  "profile": {
+                    "type": "object",
+                    "required": [
+                      "name",
+                      "department",
+                      "year",
+                      "college"
+                    ],
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "example": "John Doe"
+                      },
+                      "department": {
+                        "type": "string",
+                        "example": "Computer Science"
+                      },
+                      "year": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 4,
+                        "example": 3
+                      },
+                      "college": {
+                        "type": "string",
+                        "example": "University Name"
+                      },
+                      "rollNumber": {
+                        "type": "string",
+                        "example": "CS2024001"
+                      },
+                      "phone": {
+                        "type": "string",
+                        "example": "+919876543210"
+                      },
+                      "bio": {
+                        "type": "string",
+                        "example": "Passionate about software development"
+                      },
+                      "skills": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "example": [
+                          "JavaScript",
+                          "Node.js",
+                          "React"
+                        ]
+                      },
+                      "interests": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "example": [
+                          "Web Development",
+                          "AI"
+                        ]
+                      }
+                    }
+                  },
+                  "phone": {
+                    "type": "string",
+                    "example": "+919876543210"
+                  },
+                  "preferences": {
+                    "type": "object",
+                    "properties": {
+                      "notifications": {
+                        "type": "object",
+                        "properties": {
+                          "email": {
+                            "type": "boolean",
+                            "example": true
+                          },
+                          "sms": {
+                            "type": "boolean",
+                            "example": false
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Student registered successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "student": {
+                              "$ref": "#/components/schemas/Student"
+                            },
+                            "token": {
+                              "type": "string",
+                              "example": "firebase-id-token"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Email already registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/auth/companies/register": {
@@ -1571,7 +2341,130 @@
         "description": "Create a new company account with Firebase authentication",
         "tags": [
           "Authentication"
-        ]
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email",
+                  "password",
+                  "companyName",
+                  "documents"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "example": "contact@company.com"
+                  },
+                  "password": {
+                    "type": "string",
+                    "format": "password",
+                    "minLength": 8,
+                    "example": "SecurePass123!"
+                  },
+                  "companyName": {
+                    "type": "string",
+                    "example": "Tech Solutions Inc"
+                  },
+                  "website": {
+                    "type": "string",
+                    "format": "uri",
+                    "example": "https://techsolutions.com"
+                  },
+                  "phone": {
+                    "type": "string",
+                    "example": "+919876543210"
+                  },
+                  "address": {
+                    "type": "string",
+                    "example": "123 Business Park, Mumbai"
+                  },
+                  "documents": {
+                    "type": "object",
+                    "required": [
+                      "cinNumber"
+                    ],
+                    "properties": {
+                      "cinNumber": {
+                        "type": "string",
+                        "example": "U72900MH2024PTC123456"
+                      },
+                      "gstCertificate": {
+                        "type": "string",
+                        "format": "uri",
+                        "example": "https://example.com/gst.pdf"
+                      }
+                    }
+                  },
+                  "pointOfContact": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "example": "Jane Smith"
+                      },
+                      "designation": {
+                        "type": "string",
+                        "example": "HR Manager"
+                      },
+                      "email": {
+                        "type": "string",
+                        "format": "email",
+                        "example": "hr@techsolutions.com"
+                      },
+                      "phone": {
+                        "type": "string",
+                        "example": "+919876543211"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Company registered successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "company": {
+                              "$ref": "#/components/schemas/Company"
+                            },
+                            "token": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "409": {
+            "description": "Email already registered"
+          }
+        }
       }
     },
     "/api/auth/mentors/register": {
@@ -1580,16 +2473,246 @@
         "description": "Create a new mentor account with Firebase authentication",
         "tags": [
           "Authentication"
-        ]
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email",
+                  "password",
+                  "profile"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "example": "mentor@university.edu"
+                  },
+                  "password": {
+                    "type": "string",
+                    "format": "password",
+                    "minLength": 8,
+                    "example": "SecurePass123!"
+                  },
+                  "profile": {
+                    "type": "object",
+                    "required": [
+                      "name",
+                      "department"
+                    ],
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "example": "Dr. Jane Smith"
+                      },
+                      "department": {
+                        "type": "string",
+                        "example": "Computer Science"
+                      },
+                      "designation": {
+                        "type": "string",
+                        "example": "Associate Professor"
+                      },
+                      "phone": {
+                        "type": "string",
+                        "example": "+919876543210"
+                      },
+                      "bio": {
+                        "type": "string",
+                        "example": "Experienced mentor with 10+ years in academia"
+                      },
+                      "expertiseAreas": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "example": [
+                          "Web Development",
+                          "Database Systems"
+                        ]
+                      }
+                    }
+                  },
+                  "preferences": {
+                    "type": "object",
+                    "properties": {
+                      "notifications": {
+                        "type": "object",
+                        "properties": {
+                          "email": {
+                            "type": "boolean",
+                            "example": true
+                          },
+                          "sms": {
+                            "type": "boolean",
+                            "example": false
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Mentor registered successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "mentor": {
+                              "$ref": "#/components/schemas/Mentor"
+                            },
+                            "firebaseUid": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "409": {
+            "description": "Email already registered"
+          }
+        }
       }
     },
     "/api/auth/admins/register": {
       "post": {
         "summary": "Register a new admin",
-        "description": "Create a new admin account with Firebase authentication (requires super_admin in production)",
+        "description": "Create a new admin account with Firebase authentication. In production, requires super_admin authentication.",
         "tags": [
           "Authentication"
-        ]
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email",
+                  "password",
+                  "name"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "example": "admin@prashiskshan.com"
+                  },
+                  "password": {
+                    "type": "string",
+                    "format": "password",
+                    "minLength": 8,
+                    "example": "SecurePass123!"
+                  },
+                  "name": {
+                    "type": "string",
+                    "example": "Admin User"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "super_admin",
+                      "admin",
+                      "support"
+                    ],
+                    "default": "admin",
+                    "example": "admin"
+                  },
+                  "permissions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "example": [
+                      "manage_users",
+                      "manage_companies"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Admin registered successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "admin": {
+                              "type": "object",
+                              "properties": {
+                                "adminId": {
+                                  "type": "string"
+                                },
+                                "email": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "role": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "firebaseUid": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "403": {
+            "description": "Forbidden - Only super admins can create admin accounts in production"
+          },
+          "409": {
+            "description": "Email already registered"
+          }
+        }
       }
     },
     "/api/auth/login": {
@@ -1598,22 +2721,119 @@
         "description": "Authenticate user with Firebase ID token and get user profile",
         "tags": [
           "Authentication"
-        ]
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "idToken"
+                ],
+                "properties": {
+                  "idToken": {
+                    "type": "string",
+                    "description": "Firebase ID token obtained from client authentication",
+                    "example": "firebase-id-token-string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "user": {
+                              "type": "object",
+                              "description": "User profile based on role (Student, Company, Mentor, or Admin)"
+                            },
+                            "token": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid token"
+          },
+          "404": {
+            "description": "User profile not found"
+          }
+        }
       }
     },
     "/api/auth/send-password-reset": {
       "post": {
         "summary": "Send password reset email",
-        "description": "Send a password reset link to the user's email",
+        "description": "Send a password reset link to the user's email address",
         "tags": [
           "Authentication"
-        ]
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "example": "user@example.com"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password reset email sent successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Success"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Email is required"
+          },
+          "404": {
+            "description": "User not found"
+          }
+        }
       }
     },
     "/api/auth/verify-email": {
       "post": {
         "summary": "Send email verification",
-        "description": "Send an email verification link to the authenticated user",
+        "description": "Send an email verification link to the authenticated user's email",
         "tags": [
           "Authentication"
         ],
@@ -1621,14 +2841,59 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "responses": {
+          "200": {
+            "description": "Verification email sent successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Success"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "User email not found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
       },
       "get": {
         "summary": "Verify email",
-        "description": "Verify user email using the verification code from email link",
+        "description": "Verify user email using the verification code (oobCode) from the email link",
         "tags": [
           "Authentication"
-        ]
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "oobCode",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Verification code from email link",
+            "example": "ABC123XYZ"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Email verified successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Success"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid or expired verification code"
+          }
+        }
       }
     },
     "/api/auth/me": {
@@ -1642,7 +2907,39 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "responses": {
+          "200": {
+            "description": "Profile retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "user": {
+                              "type": "object"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
       },
       "patch": {
         "summary": "Update user profile",
@@ -1654,7 +2951,31 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "profile": {
+                    "type": "object",
+                    "description": "Profile fields to update (varies by user role)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Profile updated successfully"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
       }
     },
     "/api/auth/password": {
@@ -1668,7 +2989,41 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "newPassword",
+                  "idToken"
+                ],
+                "properties": {
+                  "newPassword": {
+                    "type": "string",
+                    "format": "password",
+                    "minLength": 8,
+                    "example": "NewSecurePass123!"
+                  },
+                  "idToken": {
+                    "type": "string",
+                    "description": "Current Firebase ID token for verification"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password changed successfully"
+          },
+          "401": {
+            "description": "Unauthorized or invalid token"
+          }
+        }
       }
     },
     "/api/auth/profile/image": {
@@ -1682,7 +3037,63 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Image file (max 5MB, formats: jpg, png, webp)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Image uploaded successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "imageUrl": {
+                              "type": "string",
+                              "format": "uri"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid file format or size"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
       }
     },
     "/api/auth/profile/resume": {
@@ -1696,7 +3107,38 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "PDF file (max 10MB)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resume uploaded successfully"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden - Students only"
+          }
+        }
       }
     },
     "/api/auth/account": {
@@ -1710,7 +3152,15 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "responses": {
+          "204": {
+            "description": "Account deleted successfully"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
       }
     },
     "/api/companies/applications": {
@@ -1754,7 +3204,19 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Retrieve company dashboard with stats and recent activities",
+        "responses": {
+          "200": {
+            "description": "Dashboard data retrieved successfully"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden - Companies only"
+          }
+        }
       }
     },
     "/api/companies/profile": {
@@ -1767,7 +3229,37 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Retrieve company profile information",
+        "responses": {
+          "200": {
+            "description": "Profile retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "company": {
+                              "$ref": "#/components/schemas/Company"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
       },
       "patch": {
         "summary": "Update company profile",
@@ -1778,7 +3270,41 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Update company profile information",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "companyName": {
+                    "type": "string"
+                  },
+                  "website": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "phone": {
+                    "type": "string"
+                  },
+                  "address": {
+                    "type": "string"
+                  },
+                  "pointOfContact": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Profile updated successfully"
+          }
+        }
       }
     },
     "/api/companies/internships": {
@@ -1791,7 +3317,154 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Create a new internship posting",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "title",
+                  "description",
+                  "department",
+                  "duration",
+                  "stipend",
+                  "location",
+                  "workMode",
+                  "startDate",
+                  "slots"
+                ],
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "example": "Full Stack Development Intern"
+                  },
+                  "description": {
+                    "type": "string",
+                    "example": "Join our dynamic team..."
+                  },
+                  "department": {
+                    "type": "string",
+                    "example": "Computer Science"
+                  },
+                  "requiredSkills": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "example": [
+                      "JavaScript",
+                      "Node.js",
+                      "React"
+                    ]
+                  },
+                  "optionalSkills": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "duration": {
+                    "type": "string",
+                    "example": "6 months"
+                  },
+                  "stipend": {
+                    "type": "number",
+                    "example": 20000
+                  },
+                  "location": {
+                    "type": "string",
+                    "example": "Bangalore"
+                  },
+                  "workMode": {
+                    "type": "string",
+                    "enum": [
+                      "remote",
+                      "onsite",
+                      "hybrid"
+                    ],
+                    "example": "hybrid"
+                  },
+                  "startDate": {
+                    "type": "string",
+                    "format": "date",
+                    "example": "2024-06-01"
+                  },
+                  "applicationDeadline": {
+                    "type": "string",
+                    "format": "date",
+                    "example": "2024-05-15"
+                  },
+                  "slots": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "example": 5
+                  },
+                  "responsibilities": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "learningOpportunities": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "eligibilityRequirements": {
+                    "type": "object",
+                    "properties": {
+                      "minYear": {
+                        "type": "integer"
+                      },
+                      "minReadinessScore": {
+                        "type": "number"
+                      },
+                      "requiredModules": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Internship created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "internship": {
+                              "$ref": "#/components/schemas/Internship"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
       },
       "get": {
         "summary": "Get all company internships",
@@ -1802,7 +3475,75 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Retrieve all internships posted by the company",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "draft",
+                "active",
+                "closed",
+                "completed"
+              ]
+            },
+            "description": "Filter by status"
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Internships retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "internships": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/Internship"
+                              }
+                            },
+                            "pagination": {
+                              "$ref": "#/components/schemas/Pagination"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/companies/internships/{internshipId}": {
@@ -1837,7 +3578,86 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Delete an internship posting",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "internshipId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Internship deleted successfully"
+          },
+          "404": {
+            "description": "Internship not found"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update internship",
+        "description": "Update an existing internship posting",
+        "tags": [
+          "Companies"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "internshipId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "draft",
+                      "active",
+                      "closed",
+                      "completed"
+                    ]
+                  },
+                  "slots": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Internship updated successfully"
+          },
+          "404": {
+            "description": "Internship not found"
+          }
+        }
       }
     },
     "/api/companies/internships/{internshipId}/complete": {
@@ -1850,12 +3670,28 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Mark an internship as completed and trigger credit processing",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "internshipId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Internship marked as complete"
+          }
+        }
       }
     },
     "/api/companies/internships/{internshipId}/applicants": {
       "get": {
-        "summary": "Get applicants for internship with filters",
+        "summary": "Get applicants for internship",
         "tags": [
           "Companies"
         ],
@@ -1877,21 +3713,30 @@
             "in": "query",
             "name": "status",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "pending",
+                "approved",
+                "rejected",
+                "shortlisted"
+              ]
+            },
+            "description": "Filter by application status"
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "default": 1
             }
           },
           {
             "in": "query",
-            "name": "companyFeedbackStatus",
+            "name": "limit",
             "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "search",
-            "schema": {
-              "type": "string"
+              "type": "integer",
+              "default": 10
             }
           },
           {
@@ -1908,7 +3753,43 @@
               "type": "integer"
             }
           }
-        ]
+        ],
+        "description": "Retrieve all applicants for a specific internship",
+        "responses": {
+          "200": {
+            "description": "Applicants retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "applications": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/Application"
+                              }
+                            },
+                            "pagination": {
+                              "$ref": "#/components/schemas/Pagination"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/companies/internships/{internshipId}/metrics": {
@@ -1944,7 +3825,52 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Review and update application status",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "applicationIds",
+                  "action"
+                ],
+                "properties": {
+                  "applicationIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "example": [
+                      "APP-2024001",
+                      "APP-2024002"
+                    ]
+                  },
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "approve",
+                      "reject",
+                      "shortlist"
+                    ],
+                    "example": "approve"
+                  },
+                  "feedback": {
+                    "type": "string",
+                    "example": "Great candidate!"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Applications reviewed successfully"
+          }
+        }
       }
     },
     "/api/companies/applications/shortlist": {
@@ -1957,12 +3883,39 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Shortlist candidates for further consideration",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "applicationIds"
+                ],
+                "properties": {
+                  "applicationIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Candidates shortlisted successfully"
+          }
+        }
       }
     },
     "/api/companies/applications/reject": {
       "post": {
-        "summary": "Reject candidates (bulk)",
+        "summary": "Reject candidates",
         "tags": [
           "Companies"
         ],
@@ -1970,7 +3923,39 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Reject candidate applications",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "applicationIds",
+                  "reason"
+                ],
+                "properties": {
+                  "applicationIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "reason": {
+                    "type": "string",
+                    "example": "Does not meet requirements"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Candidates rejected successfully"
+          }
+        }
       }
     },
     "/api/companies/applications/approve": {
@@ -2093,7 +4078,23 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Retrieve progress of all interns working with the company",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "internshipId",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by internship"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Intern progress retrieved successfully"
+          }
+        }
       }
     },
     "/api/companies/interns/{studentId}/logbooks": {
@@ -2132,7 +4133,48 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Provide feedback on a student's logbook entry",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "logbookId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "feedback"
+                ],
+                "properties": {
+                  "feedback": {
+                    "type": "string",
+                    "example": "Great work this week!"
+                  },
+                  "rating": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 5,
+                    "example": 5
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Feedback provided successfully"
+          }
+        }
       }
     },
     "/api/companies/events": {
@@ -2145,7 +4187,53 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Create a company event (workshop, webinar, etc.)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "title",
+                  "description",
+                  "date"
+                ],
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "example": "Tech Workshop"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "date": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "location": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "workshop",
+                      "webinar",
+                      "networking",
+                      "other"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Event created successfully"
+          }
+        }
       }
     },
     "/api/companies/challenges": {
@@ -2158,7 +4246,52 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Create a coding challenge or project for students",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "title",
+                  "description",
+                  "difficulty"
+                ],
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "example": "Build a REST API"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "difficulty": {
+                    "type": "string",
+                    "enum": [
+                      "beginner",
+                      "intermediate",
+                      "advanced"
+                    ]
+                  },
+                  "deadline": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "rewards": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Challenge created successfully"
+          }
+        }
       }
     },
     "/api/companies/analytics": {
@@ -2686,7 +4819,19 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Retrieve mentor dashboard with pending reviews and statistics",
+        "responses": {
+          "200": {
+            "description": "Dashboard data retrieved successfully"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden - Mentors only"
+          }
+        }
       }
     },
     "/api/mentors/applications/pending": {
@@ -2699,7 +4844,61 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Retrieve all pending applications requiring mentor approval",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pending applications retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "applications": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/Application"
+                              }
+                            },
+                            "pagination": {
+                              "$ref": "#/components/schemas/Pagination"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/mentors/applications/{applicationId}": {
@@ -2712,7 +4911,68 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Retrieve detailed information about a specific application",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "applicationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Application details retrieved successfully"
+          },
+          "404": {
+            "description": "Application not found"
+          }
+        }
+      },
+      "post": {
+        "summary": "Approve application",
+        "description": "Approve a student application",
+        "tags": [
+          "Mentors"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "applicationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "comments": {
+                    "type": "string",
+                    "example": "Approved - Good candidate"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Application approved successfully"
+          }
+        }
       }
     },
     "/api/mentors/applications/{applicationId}/approve": {
@@ -2738,7 +4998,42 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Reject a student application",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "applicationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "reason"
+                ],
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "example": "Does not meet eligibility criteria"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Application rejected successfully"
+          }
+        }
       }
     },
     "/api/mentors/logbooks/pending": {
@@ -2751,7 +5046,31 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Retrieve all pending logbooks requiring mentor review",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pending logbooks retrieved successfully"
+          }
+        }
       }
     },
     "/api/mentors/logbooks/{logbookId}": {
@@ -2764,7 +5083,26 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Retrieve detailed information about a specific logbook",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "logbookId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Logbook details retrieved successfully"
+          },
+          "404": {
+            "description": "Logbook not found"
+          }
+        }
       }
     },
     "/api/mentors/logbooks/{logbookId}/approve": {
@@ -2777,7 +5115,38 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Approve a student logbook entry",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "logbookId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "comments": {
+                    "type": "string",
+                    "example": "Good work this week"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Logbook approved successfully"
+          }
+        }
       }
     },
     "/api/mentors/logbooks/{logbookId}/revision": {
@@ -2790,7 +5159,42 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Request revisions to a student logbook entry",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "logbookId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "feedback"
+                ],
+                "properties": {
+                  "feedback": {
+                    "type": "string",
+                    "example": "Please provide more details on the challenges faced"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Revision requested successfully"
+          }
+        }
       }
     },
     "/api/mentors/skill-gaps": {
@@ -2803,7 +5207,13 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Retrieve skill gap analysis for students in mentor's department",
+        "responses": {
+          "200": {
+            "description": "Skill gap analysis retrieved successfully"
+          }
+        }
       }
     },
     "/api/mentors/department/performance": {
@@ -2816,7 +5226,13 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Retrieve performance metrics for students in mentor's department",
+        "responses": {
+          "200": {
+            "description": "Department performance retrieved successfully"
+          }
+        }
       }
     },
     "/api/mentors/interventions": {
@@ -2829,7 +5245,57 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Create an intervention record for a student",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "studentId",
+                  "type",
+                  "description"
+                ],
+                "properties": {
+                  "studentId": {
+                    "type": "string",
+                    "example": "STD-2024001"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "academic",
+                      "behavioral",
+                      "attendance",
+                      "other"
+                    ],
+                    "example": "academic"
+                  },
+                  "description": {
+                    "type": "string",
+                    "example": "Student needs additional support"
+                  },
+                  "priority": {
+                    "type": "string",
+                    "enum": [
+                      "low",
+                      "medium",
+                      "high"
+                    ],
+                    "example": "medium"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Intervention created successfully"
+          }
+        }
       },
       "get": {
         "summary": "Get all interventions",
@@ -2840,7 +5306,35 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Retrieve all interventions created by the mentor",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "studentId",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by student"
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "open",
+                "resolved",
+                "closed"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Interventions retrieved successfully"
+          }
+        }
       }
     },
     "/api/mentors/students/{studentId}/progress": {
@@ -2853,7 +5347,26 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Retrieve detailed progress information for a specific student",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "studentId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Student progress retrieved successfully"
+          },
+          "404": {
+            "description": "Student not found"
+          }
+        }
       }
     },
     "/api/mentors/students": {
@@ -2917,6 +5430,20 @@
               ],
               "default": "desc"
             }
+          }
+        ]
+      }
+    },
+    "/api/mentor/internships": {
+      "get": {
+        "summary": "Get all internships with filtering",
+        "tags": [
+          "Mentors",
+          "Internships"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
           }
         ]
       }
@@ -3579,7 +6106,7 @@
     },
     "/api/students/dashboard": {
       "get": {
-        "summary": "Get student dashboard with mentor info",
+        "summary": "Get student dashboard",
         "tags": [
           "Students"
         ],
@@ -3587,7 +6114,75 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Retrieve dashboard data including stats, recent activities, and recommendations",
+        "responses": {
+          "200": {
+            "description": "Dashboard data retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "student": {
+                              "$ref": "#/components/schemas/Student"
+                            },
+                            "stats": {
+                              "type": "object",
+                              "properties": {
+                                "totalApplications": {
+                                  "type": "integer"
+                                },
+                                "activeInternships": {
+                                  "type": "integer"
+                                },
+                                "completedInternships": {
+                                  "type": "integer"
+                                },
+                                "totalCredits": {
+                                  "type": "number"
+                                },
+                                "totalHours": {
+                                  "type": "number"
+                                }
+                              }
+                            },
+                            "recentApplications": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/Application"
+                              }
+                            },
+                            "recommendedInternships": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/Internship"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden - Students only"
+          }
+        }
       }
     },
     "/api/students/profile": {
@@ -3605,7 +6200,7 @@
     },
     "/api/students/internships": {
       "get": {
-        "summary": "Browse available internships with AI match scores",
+        "summary": "Browse available internships",
         "tags": [
           "Students"
         ],
@@ -3617,19 +6212,11 @@
         "parameters": [
           {
             "in": "query",
-            "name": "page",
+            "name": "department",
             "schema": {
-              "type": "integer"
+              "type": "string"
             },
-            "description": "Page number"
-          },
-          {
-            "in": "query",
-            "name": "limit",
-            "schema": {
-              "type": "integer"
-            },
-            "description": "Items per page"
+            "description": "Filter by department"
           },
           {
             "in": "query",
@@ -3654,11 +6241,26 @@
           },
           {
             "in": "query",
-            "name": "skills",
+            "name": "page",
             "schema": {
-              "type": "string"
+              "type": "integer",
+              "enum": [
+                "remote",
+                "onsite",
+                "hybrid"
+              ],
+              "default": 1
             },
-            "description": "Comma-separated list of skills"
+            "description": "Page number"
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            },
+            "description": "Items per page"
           },
           {
             "in": "query",
@@ -3692,12 +6294,101 @@
             },
             "description": "Include AI match scores"
           }
-        ]
+        ],
+        "description": "Get a list of available internships with filtering and pagination",
+        "responses": {
+          "200": {
+            "description": "Internships retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "items": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/Internship"
+                              }
+                            },
+                            "pagination": {
+                              "$ref": "#/components/schemas/Pagination"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/students/internships/recommended": {
       "get": {
         "summary": "Get recommended internships",
+        "tags": [
+          "Students"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Get personalized internship recommendations based on student profile",
+        "responses": {
+          "200": {
+            "description": "Recommendations retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "internships": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/Internship"
+                              }
+                            },
+                            "reasons": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              },
+                              "description": "Reasons why these internships are recommended"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/students/internships/completed": {
+      "get": {
+        "summary": "Get completed internships with credit request availability",
         "tags": [
           "Students"
         ],
@@ -3758,7 +6449,7 @@
     },
     "/api/students/applications": {
       "get": {
-        "summary": "List my applications with status",
+        "summary": "Get my applications",
         "tags": [
           "Students"
         ],
@@ -3772,15 +6463,23 @@
             "in": "query",
             "name": "status",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "pending",
+                "approved",
+                "rejected",
+                "shortlisted",
+                "withdrawn"
+              ]
             },
-            "description": "Filter by status"
+            "description": "Filter by application status"
           },
           {
             "in": "query",
             "name": "page",
             "schema": {
-              "type": "integer"
+              "type": "integer",
+              "default": 1
             },
             "description": "Page number"
           },
@@ -3788,11 +6487,124 @@
             "in": "query",
             "name": "limit",
             "schema": {
-              "type": "integer"
+              "type": "integer",
+              "default": 10
             },
             "description": "Items per page"
           }
-        ]
+        ],
+        "description": "Retrieve all applications submitted by the student",
+        "responses": {
+          "200": {
+            "description": "Applications retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "applications": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/Application"
+                              }
+                            },
+                            "pagination": {
+                              "$ref": "#/components/schemas/Pagination"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Apply to internship",
+        "description": "Submit an application for an internship",
+        "tags": [
+          "Students"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "internshipId",
+                  "coverLetter"
+                ],
+                "properties": {
+                  "internshipId": {
+                    "type": "string",
+                    "example": "INT-2024001"
+                  },
+                  "coverLetter": {
+                    "type": "string",
+                    "example": "I am writing to express my interest..."
+                  },
+                  "resumeUrl": {
+                    "type": "string",
+                    "format": "uri",
+                    "example": "https://storage.example.com/resumes/resume.pdf"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Application submitted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "application": {
+                              "$ref": "#/components/schemas/Application"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error or internship not found"
+          },
+          "409": {
+            "description": "Already applied to this internship"
+          }
+        }
       }
     },
     "/api/students/applications/{applicationId}": {
@@ -3827,7 +6639,30 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Withdraw a submitted application",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "applicationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "APP-2024001"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Application withdrawn successfully"
+          },
+          "400": {
+            "description": "Cannot withdraw application in current status"
+          },
+          "404": {
+            "description": "Application not found"
+          }
+        }
       }
     },
     "/api/students/modules/recommended": {
@@ -3840,7 +6675,13 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Get learning modules recommended for the student",
+        "responses": {
+          "200": {
+            "description": "Recommended modules retrieved successfully"
+          }
+        }
       }
     },
     "/api/students/modules/start": {
@@ -3853,7 +6694,32 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Begin working on a learning module",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "moduleCode"
+                ],
+                "properties": {
+                  "moduleCode": {
+                    "type": "string",
+                    "example": "CS301"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Module started successfully"
+          }
+        }
       }
     },
     "/api/students/modules/complete": {
@@ -3866,7 +6732,38 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Mark a learning module as completed",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "moduleCode"
+                ],
+                "properties": {
+                  "moduleCode": {
+                    "type": "string",
+                    "example": "CS301"
+                  },
+                  "score": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100,
+                    "example": 85
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Module completed successfully"
+          }
+        }
       }
     },
     "/api/students/interviews/start": {
@@ -3879,7 +6776,72 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Begin an AI-powered interview practice session",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "domain",
+                  "difficulty"
+                ],
+                "properties": {
+                  "domain": {
+                    "type": "string",
+                    "example": "Backend Development"
+                  },
+                  "difficulty": {
+                    "type": "string",
+                    "enum": [
+                      "beginner",
+                      "intermediate",
+                      "advanced"
+                    ],
+                    "example": "intermediate"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Interview session started successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "interviewId": {
+                              "type": "string"
+                            },
+                            "question": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (AI feature limit)"
+          }
+        }
       }
     },
     "/api/students/interviews/answer": {
@@ -3892,7 +6854,67 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Submit an answer to the current interview question",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "interviewId",
+                  "answer"
+                ],
+                "properties": {
+                  "interviewId": {
+                    "type": "string",
+                    "example": "INT-2024001"
+                  },
+                  "answer": {
+                    "type": "string",
+                    "example": "My answer to the question..."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Answer submitted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "feedback": {
+                              "type": "string"
+                            },
+                            "nextQuestion": {
+                              "type": "string"
+                            },
+                            "score": {
+                              "type": "number"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/students/interviews/end": {
@@ -3905,7 +6927,84 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "End the current interview practice session and get final feedback",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "interviewId"
+                ],
+                "properties": {
+                  "interviewId": {
+                    "type": "string",
+                    "example": "INT-2024001"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Interview session ended successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "interviewId": {
+                              "type": "string"
+                            },
+                            "totalScore": {
+                              "type": "number",
+                              "description": "Overall interview score"
+                            },
+                            "feedback": {
+                              "type": "string",
+                              "description": "Overall feedback and recommendations"
+                            },
+                            "strengths": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              },
+                              "description": "Identified strengths"
+                            },
+                            "areasForImprovement": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              },
+                              "description": "Areas that need improvement"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Interview session already ended"
+          },
+          "404": {
+            "description": "Interview session not found"
+          }
+        }
       }
     },
     "/api/students/interviews/history": {
@@ -3918,7 +7017,110 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Retrieve all past interview practice sessions for the student",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "domain",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by domain"
+          },
+          {
+            "in": "query",
+            "name": "difficulty",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "beginner",
+                "intermediate",
+                "advanced"
+              ]
+            },
+            "description": "Filter by difficulty level"
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            },
+            "description": "Page number"
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            },
+            "description": "Items per page"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Interview history retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "interviews": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "interviewId": {
+                                    "type": "string"
+                                  },
+                                  "domain": {
+                                    "type": "string"
+                                  },
+                                  "difficulty": {
+                                    "type": "string"
+                                  },
+                                  "totalScore": {
+                                    "type": "number"
+                                  },
+                                  "completedAt": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  "status": {
+                                    "type": "string",
+                                    "enum": [
+                                      "in_progress",
+                                      "completed",
+                                      "abandoned"
+                                    ]
+                                  }
+                                }
+                              }
+                            },
+                            "pagination": {
+                              "$ref": "#/components/schemas/Pagination"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/students/logbooks": {
@@ -3931,7 +7133,111 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Submit a weekly logbook entry",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "internshipId",
+                  "weekNumber",
+                  "hoursWorked",
+                  "activities"
+                ],
+                "properties": {
+                  "internshipId": {
+                    "type": "string",
+                    "example": "INT-2024001"
+                  },
+                  "weekNumber": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "example": 1
+                  },
+                  "startDate": {
+                    "type": "string",
+                    "format": "date",
+                    "example": "2024-01-01"
+                  },
+                  "endDate": {
+                    "type": "string",
+                    "format": "date",
+                    "example": "2024-01-07"
+                  },
+                  "hoursWorked": {
+                    "type": "number",
+                    "minimum": 0,
+                    "example": 40
+                  },
+                  "activities": {
+                    "type": "string",
+                    "example": "This week I worked on..."
+                  },
+                  "tasksCompleted": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "example": [
+                      "Task 1",
+                      "Task 2"
+                    ]
+                  },
+                  "skillsUsed": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "example": [
+                      "JavaScript",
+                      "React"
+                    ]
+                  },
+                  "challenges": {
+                    "type": "string",
+                    "example": "Faced challenges with..."
+                  },
+                  "learnings": {
+                    "type": "string",
+                    "example": "Learned about..."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Logbook submitted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "logbook": {
+                              "$ref": "#/components/schemas/Logbook"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
       },
       "get": {
         "summary": "Get my logbooks",
@@ -3942,7 +7248,82 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Retrieve all logbooks submitted by the student",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "internshipId",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by internship"
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "approved",
+                "revision_requested"
+              ]
+            },
+            "description": "Filter by status"
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Logbooks retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "logbooks": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/Logbook"
+                              }
+                            },
+                            "pagination": {
+                              "$ref": "#/components/schemas/Pagination"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/students/credits": {
@@ -3955,7 +7336,63 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Retrieve student's credit summary and NEP 2020 compliance status",
+        "responses": {
+          "200": {
+            "description": "Credits summary retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "totalCredits": {
+                              "type": "number",
+                              "example": 12.5
+                            },
+                            "totalHours": {
+                              "type": "number",
+                              "example": 500
+                            },
+                            "internships": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "internshipId": {
+                                    "type": "string"
+                                  },
+                                  "credits": {
+                                    "type": "number"
+                                  },
+                                  "hours": {
+                                    "type": "number"
+                                  }
+                                }
+                              }
+                            },
+                            "nepCompliant": {
+                              "type": "boolean",
+                              "description": "Whether student meets NEP 2020 requirements"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/students/reports/nep": {
@@ -3968,7 +7405,60 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "description": "Generate a NEP 2020 compliant internship report",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "internshipId"
+                ],
+                "properties": {
+                  "internshipId": {
+                    "type": "string",
+                    "example": "INT-2024001"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Report generation queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "jobId": {
+                              "type": "string",
+                              "description": "Job ID for tracking report generation"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid internship ID"
+          }
+        }
       }
     },
     "/api/students/chatbot": {
@@ -3981,20 +7471,59 @@
           {
             "bearerAuth": []
           }
-        ]
-      }
-    },
-    "/api/students/internships/completed": {
-      "get": {
-        "summary": "Get completed internships with credit request availability",
-        "tags": [
-          "Students"
         ],
-        "security": [
-          {
-            "bearerAuth": []
+        "description": "Query the AI chatbot for internship and career guidance",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "query"
+                ],
+                "properties": {
+                  "query": {
+                    "type": "string",
+                    "example": "What skills do I need for a backend developer internship?"
+                  }
+                }
+              }
+            }
           }
-        ]
+        },
+        "responses": {
+          "200": {
+            "description": "Chatbot response received",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "response": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (AI feature limit)"
+          }
+        }
       }
     },
     "/api/students/:studentId/credit-requests": {
@@ -4567,6 +8096,65 @@
         "responses": {
           "200": {
             "description": "File deleted successfully"
+          }
+        }
+      }
+    },
+    "/api/admins/credits/process": {
+      "post": {
+        "summary": "Process credits",
+        "description": "Process and calculate credits for students (all or specific student)",
+        "tags": [
+          "Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "studentId": {
+                    "type": "string",
+                    "description": "Process credits for specific student, omit for all students",
+                    "example": "STD-2024001"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Credit processing queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "jobId": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
           }
         }
       }

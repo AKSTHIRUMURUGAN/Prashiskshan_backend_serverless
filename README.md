@@ -39,3 +39,55 @@ Example request body for dev login:
 
 Security note: Do NOT enable `ALLOW_UID_LOGIN` in production. This bypasses Firebase authentication and should only be used during local development or automated tests.
 
+## API Documentation
+
+The Prashiskshan API is documented using OpenAPI 3.0 specification. The documentation is available at `/api/docs` when the server is running.
+
+### Viewing Documentation
+
+1. Start the development server: `npm run dev`
+2. Open your browser to: http://localhost:5000/api/docs
+3. Use the interactive Swagger UI to explore and test endpoints
+
+### Updating Documentation
+
+When adding or modifying API endpoints, update the documentation in `src/docs/openapi.mjs`. See the [API Documentation Maintenance Guide](src/docs/README.md) for detailed instructions.
+
+### Validation Scripts
+
+Before committing changes to the API documentation, run these validation scripts:
+
+```bash
+# Validate OpenAPI spec structure
+npm run validate:openapi
+
+# Validate examples match schemas
+npm run validate:examples
+
+# Check all routes are documented
+npm run validate:routes
+
+# Run all validations
+npm run validate:docs
+```
+
+### Pre-Commit Hook
+
+Install the pre-commit hook to automatically validate documentation before commits:
+
+```bash
+cd backend
+bash scripts/install-hooks.sh
+```
+
+The hook will prevent commits if documentation validation fails.
+
+### Documentation Guidelines
+
+- **Naming Conventions**: Use PascalCase for schemas, camelCase for parameters
+- **Examples**: Use realistic data with Indian context (names, colleges, locations)
+- **Completeness**: Document all request/response schemas, error cases, and workflows
+- **Testing**: Test endpoints in Swagger UI before committing
+
+For complete guidelines, see [src/docs/README.md](src/docs/README.md).
+

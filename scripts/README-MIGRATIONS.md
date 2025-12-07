@@ -4,6 +4,97 @@ This directory contains database migration scripts for the Prashiskshan backend.
 
 ## Available Migrations
 
+### Orphaned Internship References Migration
+
+**Script:** `migrate-orphaned-internship-references.js`
+
+**Purpose:** Sets up the database schema for handling orphaned internship references, which occur when internships are deleted but applications and completions still reference them. This migration implements soft delete for internships and caches essential data in dependent records.
+
+**What it does:**
+
+1. **Adds Soft Delete Fields to Internships**
+   - Sets `isDeleted: false` for all existing internships
+   - Ensures all internships have the soft delete infrastructure
+   - Preserves referential integrity for historical data
+
+2. **Identifies Orphaned Application References**
+   - Scans all applications for references to non-existent internships
+   - Adds placeholder cached data for orphaned applications
+   - Logs orphaned references for audit purposes
+
+3. **Identifies Orphaned Completion References**
+   - Scans all completions for references to non-existent internships
+   - Adds placeholder cached data for orphaned completions
+   - Logs orphaned references for audit purposes
+
+4. **Provides Statistics**
+   - Reports total internships, applications, and completions
+   - Shows count of orphaned references found
+   - Displays count of records with cached data
+
+**Usage:**
+
+```bash
+# Run the migration
+node ./scripts/migrate-orphaned-internship-references.js
+```
+
+**Environment Requirements:**
+
+- `MONGODB_URI` must be set in `.env` file
+- MongoDB connection must be accessible
+- Requires Node.js with ES modules support
+
+**Safety:**
+
+- ✅ Safe to run multiple times (idempotent)
+- ✅ Does not delete or modify existing internship data
+- ✅ Only adds new fields and cached data
+- ✅ Provides detailed logging of all operations
+- ✅ Validates operations before proceeding
+
+**Output:**
+
+The script provides detailed output including:
+- Connection status
+- Number of internships updated with soft delete fields
+- Number of orphaned applications found and fixed
+- Number of orphaned completions found and fixed
+- Migration summary with statistics
+
+**Testing:**
+
+To test the migration on a staging database:
+
+1. Update `.env` to point to staging database
+2. Run the migration
+3. Verify the output shows successful completion
+4. Check that:
+   - All internships have `isDeleted: false`
+   - Orphaned applications have `cachedInternshipData`
+   - Orphaned completions have `cachedInternshipData`
+
+**Rollback:**
+
+Since this migration only adds fields (no data deletion), rollback is not typically necessary. However, if needed:
+
+1. Remove soft delete fields from internships (optional):
+   ```javascript
+   db.internships.updateMany({}, { $unset: { isDeleted: "", deletedAt: "", deletedBy: "" } })
+   ```
+
+2. Remove cached data from applications (optional):
+   ```javascript
+   db.applications.updateMany({}, { $unset: { cachedInternshipData: "" } })
+   ```
+
+3. Remove cached data from completions (optional):
+   ```javascript
+   db.internshipcompletions.updateMany({}, { $unset: { cachedInternshipData: "" } })
+   ```
+
+---
+
 ### Credit Transfer System Migration
 
 **Script:** `migrate-credit-transfer-system.js`

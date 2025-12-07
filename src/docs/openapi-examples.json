@@ -3,13 +3,42 @@
   "/api/admins/companies/pending": {},
   "/api/admins/companies": {},
   "/api/admins/companies/{companyId}": {},
-  "/api/admins/companies/{companyId}/verify": {},
-  "/api/admins/companies/{companyId}/reject": {},
+  "/api/admins/companies/{companyId}/verify": {
+    "post": {
+      "comments": "All documents verified"
+    }
+  },
+  "/api/admins/companies/{companyId}/reject": {
+    "post": {
+      "reason": "Invalid documents"
+    }
+  },
   "/api/admins/companies/:companyId/block": {},
-  "/api/admins/companies/{companyId}/suspend": {},
-  "/api/admins/students/import": {},
+  "/api/admins/companies/{companyId}/suspend": {
+    "post": {
+      "reason": "Violation of terms"
+    }
+  },
+  "/api/admins/students/import": {
+    "post": {
+      "students": [
+        {
+          "email": "user@example.com",
+          "profile": {}
+        }
+      ]
+    }
+  },
   "/api/admins/students/import/{jobId}": {},
-  "/api/admins/mentors/assign": {},
+  "/api/admins/mentors/assign": {
+    "post": {
+      "mentorId": "MEN-2024001",
+      "studentIds": [
+        "STD-2024001",
+        "STD-2024002"
+      ]
+    }
+  },
   "/api/admins/credit-requests/pending": {},
   "/api/admins/credit-requests/{requestId}": {},
   "/api/admins/credit-requests/{requestId}/review": {},
@@ -21,7 +50,13 @@
   "/api/admins/credit-requests/reminders/stats": {},
   "/api/admins/credit-requests/reminders/send": {},
   "/api/admins/credit-requests/reminders/schedule": {},
-  "/api/admins/reports/system": {},
+  "/api/admins/reports/system": {
+    "post": {
+      "startDate": "string",
+      "endDate": "string",
+      "reportType": "summary"
+    }
+  },
   "/api/admins/analytics/system": {},
   "/api/admins/analytics/college": {},
   "/api/admins/system/health": {},
@@ -29,6 +64,10 @@
   "/api/admins/internships/{internshipId}/approve": {},
   "/api/admins/internships/{internshipId}/reject": {},
   "/api/admins/internships": {},
+  "/api/admins/internships/list": {},
+  "/api/admins/internships/bulk-approve": {},
+  "/api/admins/internships/bulk-reject": {},
+  "/api/admins/internships/analytics": {},
   "/api/admins/internships/pending": {},
   "/api/admins/internships/{id}/approve": {},
   "/api/admins/internships/{id}/reject": {},
@@ -41,6 +80,11 @@
   "/api/admins/reappeals": {},
   "/api/admins/reappeals/{companyId}/approve": {},
   "/api/admins/reappeals/{companyId}/reject": {},
+  "/api/admins/internships/:id/details": {},
+  "/api/admins/internships/:id/approve-posting": {},
+  "/api/admins/internships/:id/reject-posting": {},
+  "/api/admins/internships/:id/edit": {},
+  "/api/admins/internships/:id": {},
   "/api/applications/{id}/status": {
     "patch": {
       "status": "string",
@@ -48,29 +92,207 @@
       "rejectionReason": "string"
     }
   },
-  "/api/auth/students/register": {},
-  "/api/auth/companies/register": {},
-  "/api/auth/mentors/register": {},
-  "/api/auth/admins/register": {},
-  "/api/auth/login": {},
-  "/api/auth/send-password-reset": {},
+  "/api/auth/students/register": {
+    "post": {
+      "email": "student@university.edu",
+      "password": "SecurePass123!",
+      "profile": {
+        "name": "John Doe",
+        "department": "Computer Science",
+        "year": 3,
+        "college": "University Name",
+        "rollNumber": "CS2024001",
+        "phone": "+919876543210",
+        "bio": "Passionate about software development",
+        "skills": [
+          "JavaScript",
+          "Node.js",
+          "React"
+        ],
+        "interests": [
+          "Web Development",
+          "AI"
+        ]
+      },
+      "phone": "+919876543210",
+      "preferences": {
+        "notifications": {
+          "email": true,
+          "sms": false
+        }
+      }
+    }
+  },
+  "/api/auth/companies/register": {
+    "post": {
+      "email": "contact@company.com",
+      "password": "SecurePass123!",
+      "companyName": "Tech Solutions Inc",
+      "website": "https://techsolutions.com",
+      "phone": "+919876543210",
+      "address": "123 Business Park, Mumbai",
+      "documents": {
+        "cinNumber": "U72900MH2024PTC123456",
+        "gstCertificate": "https://example.com/gst.pdf"
+      },
+      "pointOfContact": {
+        "name": "Jane Smith",
+        "designation": "HR Manager",
+        "email": "hr@techsolutions.com",
+        "phone": "+919876543211"
+      }
+    }
+  },
+  "/api/auth/mentors/register": {
+    "post": {
+      "email": "mentor@university.edu",
+      "password": "SecurePass123!",
+      "profile": {
+        "name": "Dr. Jane Smith",
+        "department": "Computer Science",
+        "designation": "Associate Professor",
+        "phone": "+919876543210",
+        "bio": "Experienced mentor with 10+ years in academia",
+        "expertiseAreas": [
+          "Web Development",
+          "Database Systems"
+        ]
+      },
+      "preferences": {
+        "notifications": {
+          "email": true,
+          "sms": false
+        }
+      }
+    }
+  },
+  "/api/auth/admins/register": {
+    "post": {
+      "email": "admin@prashiskshan.com",
+      "password": "SecurePass123!",
+      "name": "Admin User",
+      "role": "admin",
+      "permissions": [
+        "manage_users",
+        "manage_companies"
+      ]
+    }
+  },
+  "/api/auth/login": {
+    "post": {
+      "idToken": "firebase-id-token-string"
+    }
+  },
+  "/api/auth/send-password-reset": {
+    "post": {
+      "email": "user@example.com"
+    }
+  },
   "/api/auth/verify-email": {},
-  "/api/auth/me": {},
-  "/api/auth/password": {},
-  "/api/auth/profile/image": {},
-  "/api/auth/profile/resume": {},
+  "/api/auth/me": {
+    "patch": {
+      "profile": {}
+    }
+  },
+  "/api/auth/password": {
+    "post": {
+      "newPassword": "NewSecurePass123!",
+      "idToken": "string"
+    }
+  },
+  "/api/auth/profile/image": {
+    "post": {
+      "file": "string"
+    }
+  },
+  "/api/auth/profile/resume": {
+    "post": {
+      "file": "string"
+    }
+  },
   "/api/auth/account": {},
   "/api/companies/applications": {},
   "/api/companies/dashboard": {},
-  "/api/companies/profile": {},
-  "/api/companies/internships": {},
-  "/api/companies/internships/{internshipId}": {},
+  "/api/companies/profile": {
+    "patch": {
+      "companyName": "string",
+      "website": "string",
+      "phone": "string",
+      "address": "string",
+      "pointOfContact": {}
+    }
+  },
+  "/api/companies/internships": {
+    "post": {
+      "title": "Full Stack Development Intern",
+      "description": "Join our dynamic team...",
+      "department": "Computer Science",
+      "requiredSkills": [
+        "JavaScript",
+        "Node.js",
+        "React"
+      ],
+      "optionalSkills": [
+        "string"
+      ],
+      "duration": "6 months",
+      "stipend": 20000,
+      "location": "Bangalore",
+      "workMode": "hybrid",
+      "startDate": "2024-06-01",
+      "applicationDeadline": "2024-05-15",
+      "slots": 5,
+      "responsibilities": [
+        "string"
+      ],
+      "learningOpportunities": [
+        "string"
+      ],
+      "eligibilityRequirements": {
+        "minYear": 1,
+        "minReadinessScore": 1,
+        "requiredModules": [
+          "string"
+        ]
+      }
+    }
+  },
+  "/api/companies/internships/{internshipId}": {
+    "put": {
+      "title": "string",
+      "description": "string",
+      "status": "draft",
+      "slots": 1
+    }
+  },
   "/api/companies/internships/{internshipId}/complete": {},
   "/api/companies/internships/{internshipId}/applicants": {},
   "/api/companies/internships/{internshipId}/metrics": {},
-  "/api/companies/applications/review": {},
-  "/api/companies/applications/shortlist": {},
-  "/api/companies/applications/reject": {},
+  "/api/companies/applications/review": {
+    "post": {
+      "applicationIds": [
+        "APP-2024001",
+        "APP-2024002"
+      ],
+      "action": "approve",
+      "feedback": "Great candidate!"
+    }
+  },
+  "/api/companies/applications/shortlist": {
+    "post": {
+      "applicationIds": [
+        "string"
+      ]
+    }
+  },
+  "/api/companies/applications/reject": {
+    "post": {
+      "applicationIds": [
+        "string"
+      ],
+      "reason": "Does not meet requirements"
+    }
+  },
   "/api/companies/applications/approve": {
     "post": {
       "applicationId": "string",
@@ -90,9 +312,30 @@
   "/api/companies/interns/progress": {},
   "/api/companies/interns/{studentId}/logbooks": {},
   "/api/companies/interns/{applicationId}/complete": {},
-  "/api/companies/logbooks/{logbookId}/feedback": {},
-  "/api/companies/events": {},
-  "/api/companies/challenges": {},
+  "/api/companies/logbooks/{logbookId}/feedback": {
+    "post": {
+      "feedback": "Great work this week!",
+      "rating": 5
+    }
+  },
+  "/api/companies/events": {
+    "post": {
+      "title": "Tech Workshop",
+      "description": "string",
+      "date": "string",
+      "location": "string",
+      "type": "workshop"
+    }
+  },
+  "/api/companies/challenges": {
+    "post": {
+      "title": "Build a REST API",
+      "description": "string",
+      "difficulty": "beginner",
+      "deadline": "string",
+      "rewards": {}
+    }
+  },
   "/api/companies/analytics": {},
   "/api/companies/analytics/export": {},
   "/api/companies/re-appeal": {},
@@ -138,19 +381,43 @@
   },
   "/api/mentors/dashboard": {},
   "/api/mentors/applications/pending": {},
-  "/api/mentors/applications/{applicationId}": {},
+  "/api/mentors/applications/{applicationId}": {
+    "post": {
+      "comments": "Approved - Good candidate"
+    }
+  },
   "/api/mentors/applications/{applicationId}/approve": {},
-  "/api/mentors/applications/{applicationId}/reject": {},
+  "/api/mentors/applications/{applicationId}/reject": {
+    "post": {
+      "reason": "Does not meet eligibility criteria"
+    }
+  },
   "/api/mentors/logbooks/pending": {},
   "/api/mentors/logbooks/{logbookId}": {},
-  "/api/mentors/logbooks/{logbookId}/approve": {},
-  "/api/mentors/logbooks/{logbookId}/revision": {},
+  "/api/mentors/logbooks/{logbookId}/approve": {
+    "post": {
+      "comments": "Good work this week"
+    }
+  },
+  "/api/mentors/logbooks/{logbookId}/revision": {
+    "post": {
+      "feedback": "Please provide more details on the challenges faced"
+    }
+  },
   "/api/mentors/skill-gaps": {},
   "/api/mentors/department/performance": {},
-  "/api/mentors/interventions": {},
+  "/api/mentors/interventions": {
+    "post": {
+      "studentId": "STD-2024001",
+      "type": "academic",
+      "description": "Student needs additional support",
+      "priority": "medium"
+    }
+  },
   "/api/mentors/students/{studentId}/progress": {},
   "/api/mentors/students": {},
   "/api/mentor/internships/pending": {},
+  "/api/mentor/internships": {},
   "/api/mentor/internships/{internshipId}": {},
   "/api/mentor/internships/{internshipId}/approve": {
     "post": {
@@ -192,22 +459,78 @@
   "/api/students/profile": {},
   "/api/students/internships": {},
   "/api/students/internships/recommended": {},
+  "/api/students/internships/completed": {},
   "/api/students/internships/{internshipId}": {},
   "/api/students/internships/{internshipId}/apply": {},
-  "/api/students/applications": {},
+  "/api/students/applications": {
+    "post": {
+      "internshipId": "INT-2024001",
+      "coverLetter": "I am writing to express my interest...",
+      "resumeUrl": "https://storage.example.com/resumes/resume.pdf"
+    }
+  },
   "/api/students/applications/{applicationId}": {},
   "/api/students/modules/recommended": {},
-  "/api/students/modules/start": {},
-  "/api/students/modules/complete": {},
-  "/api/students/interviews/start": {},
-  "/api/students/interviews/answer": {},
-  "/api/students/interviews/end": {},
+  "/api/students/modules/start": {
+    "post": {
+      "moduleCode": "CS301"
+    }
+  },
+  "/api/students/modules/complete": {
+    "post": {
+      "moduleCode": "CS301",
+      "score": 85
+    }
+  },
+  "/api/students/interviews/start": {
+    "post": {
+      "domain": "Backend Development",
+      "difficulty": "intermediate"
+    }
+  },
+  "/api/students/interviews/answer": {
+    "post": {
+      "interviewId": "INT-2024001",
+      "answer": "My answer to the question..."
+    }
+  },
+  "/api/students/interviews/end": {
+    "post": {
+      "interviewId": "INT-2024001"
+    }
+  },
   "/api/students/interviews/history": {},
-  "/api/students/logbooks": {},
+  "/api/students/logbooks": {
+    "post": {
+      "internshipId": "INT-2024001",
+      "weekNumber": 1,
+      "startDate": "2024-01-01",
+      "endDate": "2024-01-07",
+      "hoursWorked": 40,
+      "activities": "This week I worked on...",
+      "tasksCompleted": [
+        "Task 1",
+        "Task 2"
+      ],
+      "skillsUsed": [
+        "JavaScript",
+        "React"
+      ],
+      "challenges": "Faced challenges with...",
+      "learnings": "Learned about..."
+    }
+  },
   "/api/students/credits": {},
-  "/api/students/reports/nep": {},
-  "/api/students/chatbot": {},
-  "/api/students/internships/completed": {},
+  "/api/students/reports/nep": {
+    "post": {
+      "internshipId": "INT-2024001"
+    }
+  },
+  "/api/students/chatbot": {
+    "post": {
+      "query": "What skills do I need for a backend developer internship?"
+    }
+  },
   "/api/students/:studentId/credit-requests": {},
   "/api/students/:studentId/credit-requests/:requestId": {},
   "/api/students/:studentId/credit-requests/:requestId/resubmit": {},
@@ -254,6 +577,11 @@
     },
     "delete": {
       "url": "string"
+    }
+  },
+  "/api/admins/credits/process": {
+    "post": {
+      "studentId": "STD-2024001"
     }
   }
 }

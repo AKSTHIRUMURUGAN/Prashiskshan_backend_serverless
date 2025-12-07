@@ -46,6 +46,12 @@ export const getInternshipsList = async (req, res, next) => {
     // Build query
     const query = {};
     
+    // Default filter: exclude deleted internships unless explicitly requested
+    // Admins can include deleted internships by passing includeDeleted=true
+    if (req.query.includeDeleted !== "true") {
+      query.isDeleted = { $ne: true };
+    }
+    
     // Status filter
     if (status && status !== "all") {
       query.status = status;
@@ -735,6 +741,7 @@ export const getInternshipAnalytics = async (req, res, next) => {
     const reviewedInternships = await Internship.find({
       ...dateFilter,
       "adminReview.reviewedAt": { $exists: true },
+      isDeleted: { $ne: true },
     })
       .select("createdAt adminReview.reviewedAt")
       .lean();

@@ -36,6 +36,18 @@ const aiRankingSchema = new Schema(
   { _id: false },
 );
 
+const cachedInternshipDataSchema = new Schema(
+  {
+    title: String,
+    department: String,
+    companyName: String,
+    startDate: Date,
+    endDate: Date,
+    applicationDeadline: Date,
+  },
+  { _id: false },
+);
+
 const timelineSchema = new Schema(
   {
     event: { type: String, required: true },
@@ -67,6 +79,8 @@ const applicationSchema = new Schema(
     aiRanking: aiRankingSchema,
     interviewScore: Number,
     timeline: { type: [timelineSchema], default: [] },
+    // Cached internship data for orphaned reference handling
+    cachedInternshipData: cachedInternshipDataSchema,
   },
   { timestamps: true },
 );
