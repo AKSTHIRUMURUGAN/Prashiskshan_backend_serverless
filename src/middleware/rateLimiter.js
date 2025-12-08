@@ -24,11 +24,12 @@ const generalRateLimiter = rateLimit({
 });
 
 const authRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: process.env.NODE_ENV === 'development' ? 1000 : 5,
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: process.env.NODE_ENV === 'development' ? 10000 : 50, // Increased from 5 to 50 for production
   standardHeaders: true,
   legacyHeaders: false,
   store: createRedisStore(),
+  skip: (req) => process.env.AUTH_RATE_LIMIT_DISABLED === 'true',
   message: { success: false, error: "Too many login attempts, please try again later." },
 });
 

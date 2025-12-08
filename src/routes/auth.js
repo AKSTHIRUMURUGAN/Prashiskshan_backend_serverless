@@ -100,13 +100,26 @@ router.post("/send-password-reset", authRateLimiter, asyncHandler(sendPasswordRe
 
 /**
  * @swagger
- * /api/auth/verify-email:
+ * /api/auth/send-verification-email:
  *   post:
  *     summary: Send email verification
  *     description: Send an email verification link to the authenticated user
  *     tags: [Authentication]
  *     security:
  *       - bearerAuth: []
+ */
+router.post("/send-verification-email", authenticate, identifyUser, asyncHandler(sendVerificationEmail));
+
+/**
+ * @swagger
+ * /api/auth/verify-email:
+ *   post:
+ *     summary: Send email verification (legacy)
+ *     description: Send an email verification link to the authenticated user (use /send-verification-email instead)
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     deprecated: true
  */
 router.post("/verify-email", authenticate, identifyUser, asyncHandler(sendVerificationEmail));
 
