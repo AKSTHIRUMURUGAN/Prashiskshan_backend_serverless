@@ -258,7 +258,6 @@ app.get("/api/health", (_req, res) => {
 
 // Lazy load heavy dependencies
 let apiRouter;
-let swaggerUi;
 let swaggerSpec;
 let openapiSpec;
 let requestLogger;
@@ -268,6 +267,7 @@ let generalRateLimiter;
 let connectDB;
 let registerBullBoard;
 let logger;
+let getSwaggerHTML;
 
 let isInitialized = false;
 let isConnected = false;
@@ -288,6 +288,7 @@ const initializeApp = async () => {
     const loggerUtil = await import("../src/utils/logger.js");
     const queuesModule = await import("../src/queues/index.js");
     const swaggerModule = await import("../src/config/swagger.js");
+    const swaggerStandaloneModule = await import("./swagger-standalone.js");
     
     // Assign imports
     apiRouter = routesModule.default;
@@ -299,71 +300,56 @@ const initializeApp = async () => {
     registerBullBoard = queuesModule.registerBullBoard;
     logger = loggerUtil.logger;
     swaggerSpec = swaggerModule.swaggerSpec;
+    getSwaggerHTML = swaggerStandaloneModule.getSwaggerHTML;
     
-    // Try to import swagger-ui and openapi (optional)
+    // Try to import OpenAPI spec (optional)
     try {
-      const swaggerUiModule = await import("swagger-ui-express");
-      swaggerUi = swaggerUiModule.default;
+      const openapiModule = await import("../src/docs/openapi.mjs");
+      openapiSpec = openapiModule.default;
+    } catch (openapiError) {
+      console.warn("OpenAPI spec not available:", openapiError.message);
+    }
+    
+    // Setup Swagger UI routes using CDN (works better in serverless)
+    if (swaggerSpec && getSwaggerHTML) {
+      // Swagger UI at /api-docs
+      app.get("/api-docs", (_req, res) => {
+        res.send(getSwaggerHTML("/swagger.json", "Prashiskshan API Documentation"));
+      });
+      console.log("Swagger UI configured at /api-docs");
       
-      // Import OpenAPI spec
-      try {
-        const openapiModule = await import("../src/docs/openapi.mjs");
-        openapiSpec = openapiModule.default;
-      } catch (openapiError) {
-        console.warn("OpenAPI spec not available:", openapiError.message);
-      }
-      
-      // Setup Swagger UI with generated spec at /api-docs
-      if (swaggerSpec && swaggerUi) {
-        app.use("/api-docs", swaggerUi.serve);
-        app.get("/api-docs", swaggerUi.setup(swaggerSpec, {
-          customCss: ".swagger-ui .topbar { display: none }",
-          customSiteTitle: "Prashiskshan API Documentation",
-          customfavIcon: "/favicon.ico",
-        }));
-        console.log("Swagger UI configured at /api-docs");
-      }
-      
-      // Setup alternative Swagger UI at /swagger
-      if (swaggerSpec && swaggerUi) {
-        app.get("/swagger", swaggerUi.setup(swaggerSpec, {
-          customCss: ".swagger-ui .topbar { display: none }",
-          customSiteTitle: "Prashiskshan API Documentation",
-          customfavIcon: "/favicon.ico",
-        }));
-        console.log("Swagger UI configured at /swagger");
-      }
-      
-      // Setup OpenAPI spec at /api/docs
-      if (openapiSpec && swaggerUi) {
-        app.get("/api/docs", swaggerUi.setup(openapiSpec, {
-          customCss: ".swagger-ui .topbar { display: none }",
-          customSiteTitle: "Prashiskshan OpenAPI Documentation",
-        }));
-        console.log("OpenAPI UI configured at /api/docs");
-      }
-      
-      // Serve OpenAPI JSON spec
-      if (openapiSpec) {
-        app.get("/api/docs.json", (_req, res) => {
-          res.json(openapiSpec);
-        });
-        console.log("OpenAPI JSON spec available at /api/docs.json");
-      }
-      
-      // Serve Swagger JSON spec
-      if (swaggerSpec) {
-        app.get("/swagger.json", (_req, res) => {
-          res.json(swaggerSpec);
-        });
-        app.get("/api-docs.json", (_req, res) => {
-          res.json(swaggerSpec);
-        });
-        console.log("Swagger JSON spec available at /swagger.json and /api-docs.json");
-      }
-      
-    } catch (swaggerError) {
-      console.warn("Swagger UI not available:", swaggerError.message);
+      // Swagger UI at /swagger (alternative)
+      app.get("/swagger", (_req, res) => {
+        res.send(getSwaggerHTML("/swagger.json", "Prashiskshan API Documentation"));
+      });
+      console.log("Swagger UI configured at /swagger");
+    }
+    
+    // Setup OpenAPI UI at /api/docs
+    if (openapiSpec && getSwaggerHTML) {
+      app.get("/api/docs", (_req, res) => {
+        res.send(getSwaggerHTML("/api/docs.json", "Prashiskshan OpenAPI Documentation"));
+      });
+      console.log("OpenAPI UI configured at /api/docs");
+    }
+    
+    // Serve OpenAPI JSON spec
+    if (openapiSpec) {
+      app.get("/api/docs.json", (_req, res) => {
+        res.json(openapiSpec);
+      });
+      console.log("OpenAPI JSON spec available at /api/docs.json");
+    }
+    
+    // Serve Swagger JSON spec
+    if (swaggerSpec) {
+      app.get("/swagger.json", (_req, res) => {
+        res.json(swaggerSpec);
+      });
+      app.get("/api-docs.json", (_req, res) => {
+        res.json(swaggerSpec);
+      });
+      console.log("Swagger JSON spec available at /swagger.json and /api-docs.json");
     }
     
     // Add middleware
