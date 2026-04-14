@@ -21,9 +21,7 @@
     "validate:routes": "node ./scripts/validate-route-coverage.js",
     "validate:routes:report": "node ./scripts/validate-route-coverage.js --report",
     "test:swagger": "node ./scripts/test-swagger-ui.js",
-    "validate:docs": "npm run validate:openapi && npm run validate:examples && npm run validate:routes",
-    "install:hooks": "node -e \"require('child_process').execSync(process.platform === 'win32' ? 'powershell -ExecutionPolicy Bypass -File ./scripts/install-hooks.ps1' : 'bash ./scripts/install-hooks.sh', {stdio: 'inherit'})\"",
-    "postinstall": "npm run install:hooks || echo 'Git hooks installation skipped'"
+    "validate:docs": "npm run validate:openapi && npm run validate:examples && npm run validate:routes"
   },
   "keywords": [
     "prashiskshan",
