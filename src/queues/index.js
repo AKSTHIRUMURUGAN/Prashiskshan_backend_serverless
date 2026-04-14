@@ -32,44 +32,99 @@ const queues = {};
 const queueEvents = {};
 let bullBoardRegistered = false;
 let shuttingDown = false;
+let queuesInitialized = false;
 
-const initQueue = (key, definition) => {
-  const queue = new Queue(definition.name, {
-    connection: bullConnection,
-    defaultJobOptions: { ...DEFAULT_JOB_OPTIONS, ...definition.defaultJobOptions },
-  });
-  queues[key] = queue;
-
-  const events = new QueueEvents(definition.name, { connection: bullConnection });
-  events.on("failed", ({ jobId, failedReason }) => {
-    logger.error(`Queue ${definition.name} job failed`, { jobId, failedReason });
-  });
-  events.on("completed", ({ jobId }) => {
-    logger.info(`Queue ${definition.name} job completed`, { jobId });
-  });
-
-  events
-    .waitUntilReady()
-    .then(() => logger.info(`Queue events ready for ${definition.name}`))
-    .catch((error) => logger.error(`Queue events failed for ${definition.name}`, { error: error.message }));
-
-  queueEvents[key] = events;
-  return queue;
+// Check if Redis is configured
+const isRedisConfigured = () => {
+  return !!(process.env.REDIS_HOST && process.env.REDIS_PORT);
 };
 
-Object.entries(QUEUE_DEFINITIONS).forEach(([key, definition]) => initQueue(key, definition));
+const initQueue = (key, definition) => {
+  try {
+    const queue = new Queue(definition.name, {
+      connection: bullConnection,
+      defaultJobOptions: { ...DEFAULT_JOB_OPTIONS, ...definition.defaultJobOptions },
+    });
+    queues[key] = queue;
 
-export const getQueue = (queueKey) => queues[queueKey] || null;
+    // Only create QueueEvents if not in serverless or if explicitly enabled
+    const shouldCreateEvents = process.env.ENABLE_QUEUE_EVENTS !== 'false';
+    
+    if (shouldCreateEvents) {
+      const events = new QueueEvents(definition.name, { connection: bullConnection });
+      events.on("failed", ({ jobId, failedReason }) => {
+        logger.error(`Queue ${definition.name} job failed`, { jobId, failedReason });
+      });
+      events.on("completed", ({ jobId }) => {
+        logger.info(`Queue ${definition.name} job completed`, { jobId });
+      });
+
+      events
+        .waitUntilReady()
+        .then(() => logger.info(`Queue events ready for ${definition.name}`))
+        .catch((error) => {
+          logger.error(`Queue events failed for ${definition.name}`, { error: error.message });
+          // Don't crash if queue events fail
+        });
+
+      queueEvents[key] = events;
+    }
+    
+    return queue;
+  } catch (error) {
+    logger.error(`Failed to initialize queue ${definition.name}`, { error: error.message });
+    return null;
+  }
+};
+
+// Lazy initialization - only create queues when first accessed
+const ensureQueuesInitialized = () => {
+  if (queuesInitialized) return;
+  
+  if (!isRedisConfigured()) {
+    logger.warn("Redis not configured - queues will not be available");
+    queuesInitialized = true;
+    return;
+  }
+  
+  try {
+    logger.info("Initializing BullMQ queues...");
+    Object.entries(QUEUE_DEFINITIONS).forEach(([key, definition]) => initQueue(key, definition));
+    queuesInitialized = true;
+    logger.info(`Initialized ${Object.keys(queues).length} queues`);
+  } catch (error) {
+    logger.error("Failed to initialize queues", { error: error.message });
+    queuesInitialized = true; // Mark as initialized to prevent retry loops
+  }
+};
+
+export const getQueue = (queueKey) => {
+  ensureQueuesInitialized();
+  return queues[queueKey] || null;
+};
 
 export const addToQueue = async (queueKey, jobName, data = {}, options = {}) => {
+  if (!isRedisConfigured()) {
+    logger.warn(`Queue ${queueKey} not available - Redis not configured`);
+    return null;
+  }
+  
   const queue = getQueue(queueKey);
   if (!queue) {
-    throw new Error(`Queue ${queueKey} is not registered`);
+    logger.warn(`Queue ${queueKey} is not registered or failed to initialize`);
+    return null;
   }
-  return queue.add(jobName, data, options);
+  
+  try {
+    return await queue.add(jobName, data, options);
+  } catch (error) {
+    logger.error(`Failed to add job to queue ${queueKey}`, { error: error.message });
+    return null;
+  }
 };
 
 export const getQueueStatus = async (queueKey) => {
+  ensureQueuesInitialized();
   const queue = getQueue(queueKey);
   if (!queue) throw new Error(`Queue ${queueKey} is not registered`);
   const [counts, metrics] = await Promise.all([queue.getJobCounts(), queue.getMetrics("completed")]);
@@ -81,6 +136,19 @@ export const getQueueStatus = async (queueKey) => {
 
 export const registerBullBoard = async (app, { basePath = "/admin/queues", middleware } = {}) => {
   if (bullBoardRegistered) return null;
+  
+  if (!isRedisConfigured()) {
+    logger.warn("Redis not configured - Bull Board will not be available");
+    return null;
+  }
+  
+  ensureQueuesInitialized();
+  
+  if (Object.keys(queues).length === 0) {
+    logger.warn("No queues available - Bull Board will not be registered");
+    return null;
+  }
+  
   try {
     const [{ createBullBoard }, { BullMQAdapter }] = await Promise.all([
       import("@bull-board/api"),
