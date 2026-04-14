@@ -60,10 +60,23 @@ export const storageService = {
     const uploadResult = await putObject(target, key, buffer, contentType);
     logger.info(`Uploaded file to ${provider}`, { key });
 
-    const result = { provider: target.name, key, url: target.url(key) };
-    if (target.name === "imagekit" && uploadResult && uploadResult.fileId) {
+    const result = { provider: target.name, key };
+    
+    // For ImageKit, use the URL returned by the API
+    if (target.name === "imagekit" && uploadResult) {
+      result.url = uploadResult.url; // Use the actual URL from ImageKit response
       result.fileId = uploadResult.fileId;
+      result.thumbnailUrl = uploadResult.thumbnailUrl;
+      logger.info(`ImageKit upload successful`, { 
+        url: uploadResult.url, 
+        fileId: uploadResult.fileId,
+        filePath: uploadResult.filePath 
+      });
+    } else {
+      // For S3/R2, construct the URL
+      result.url = target.url(key);
     }
+    
     return result;
   },
   async uploadToMultiple(buffer, options = {}) {
@@ -74,10 +87,18 @@ export const storageService = {
         const key = `${new Date().toISOString().slice(0, 10)}/${randomUUID()}-${options.filename || "blob"}`;
         const uploadResult = await putObject(providerConfig, key, buffer, options.contentType || "application/octet-stream");
 
-        const result = { provider: providerConfig.name, key, url: providerConfig.url(key) };
-        if (providerConfig.name === "imagekit" && uploadResult && uploadResult.fileId) {
+        const result = { provider: providerConfig.name, key };
+        
+        // For ImageKit, use the URL returned by the API
+        if (providerConfig.name === "imagekit" && uploadResult) {
+          result.url = uploadResult.url; // Use the actual URL from ImageKit response
           result.fileId = uploadResult.fileId;
+          result.thumbnailUrl = uploadResult.thumbnailUrl;
+        } else {
+          // For S3/R2, construct the URL
+          result.url = providerConfig.url(key);
         }
+        
         return result;
       }),
     );
