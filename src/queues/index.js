@@ -149,4 +149,21 @@ export const queueRegistry = Object.freeze({
   queues,
 });
 
+// Export individual queues for easy access
+export const emailQueue = queues.email;
+export const smsQueue = queues.sms;
+export const logbookQueue = queues.logbook;
+export const reportQueue = queues.report;
+export const notificationQueue = queues.notification;
+export const completionQueue = queues.completion;
+export const aiQueue = queues.ai;
+export const creditNotificationQueue = queues.creditNotification;
+
+// Additional queues for cron jobs (these need to be added to QUEUE_DEFINITIONS)
+export const metricsQueue = queues.metrics || initQueue("metrics", { name: "metrics" });
+export const creditReminderQueue = queues.creditReminder || initQueue("creditReminder", { name: "credit-reminders" });
+export const deadlineReminderQueue = queues.deadlineReminder || initQueue("deadlineReminder", { name: "deadline-reminders" });
+export const expiredInternshipQueue = queues.expiredInternship || initQueue("expiredInternship", { name: "expired-internships" });
+export const analyticsSnapshotQueue = queues.analyticsSnapshot || initQueue("analyticsSnapshot", { name: "analytics-snapshots" });
+
 export default queues;

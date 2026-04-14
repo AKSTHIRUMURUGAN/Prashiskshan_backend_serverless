@@ -1,0 +1,6 @@
+email,name,department,year,college,rollNumber,phone,bio,skills,interests
+john.doe@university.edu,John Doe,Computer Science,3,Tech University,CS2021001,1234567890,Passionate software developer interested in full-stack development,"JavaScript,Python,React,Node.js","Web Development,AI,Cloud Computing"
+jane.smith@university.edu,Jane Smith,Electrical Engineering,2,Tech University,EE2022001,0987654321,Enthusiastic learner with focus on embedded systems,"C++,MATLAB,Arduino","Robotics,IoT,Automation"
+bob.johnson@university.edu,Bob Johnson,Mechanical Engineering,4,Tech University,ME2020001,5551234567,Experienced in CAD and manufacturing processes,"CAD,SolidWorks,AutoCAD","Manufacturing,Design,3D Printing"
+alice.williams@university.edu,Alice Williams,Information Technology,1,Tech University,IT2023001,5559876543,Beginner passionate about cybersecurity,"Python,Linux,Networking","Cybersecurity,Ethical Hacking"
+charlie.brown@university.edu,Charlie Brown,Civil Engineering,5,Tech University,CE2019001,5551112222,Final year student specializing in structural engineering,"AutoCAD,STAAD Pro,Revit","Construction,Infrastructure,Sustainability"

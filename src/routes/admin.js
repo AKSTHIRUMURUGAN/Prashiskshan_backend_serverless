@@ -9,7 +9,10 @@ import {
   blockCompany,
   suspendCompany,
   bulkImportStudents,
+  bulkImportMentors,
   getImportJobStatus,
+  downloadImportCredentials,
+  downloadImportTemplate,
   assignMentor,
   generateSystemReport,
   getAdminAnalytics,
@@ -176,14 +179,37 @@ router.post("/companies/:companyId/suspend", adminAuth, asyncHandler(suspendComp
 
 /**
  * @swagger
- * /api/admins/students/import:
- *   post:
- *     summary: Bulk import students
+ * /api/admins/students/import/template:
+ *   get:
+ *     summary: Download CSV template for student import
  *     tags: [Admin]
  *     security:
  *       - bearerAuth: []
  */
-router.post("/students/import", adminAuth, asyncHandler(bulkImportStudents));
+router.get("/students/import/template", adminAuth, asyncHandler(downloadImportTemplate));
+
+/**
+ * @swagger
+ * /api/admins/students/import:
+ *   post:
+ *     summary: Bulk import students (accepts CSV/Excel file or JSON)
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.post("/students/import", adminAuth, async (req, res, next) => {
+  // Import multer middleware dynamically
+  const { uploadStudentFile } = await import("../middleware/fileUpload.js");
+  
+  // Apply multer middleware
+  uploadStudentFile(req, res, (err) => {
+    if (err) {
+      return next(err);
+    }
+    // Continue to the actual handler
+    asyncHandler(bulkImportStudents)(req, res, next);
+  });
+});
 
 /**
  * @swagger
@@ -195,6 +221,73 @@ router.post("/students/import", adminAuth, asyncHandler(bulkImportStudents));
  *       - bearerAuth: []
  */
 router.get("/students/import/:jobId", adminAuth, asyncHandler(getImportJobStatus));
+
+/**
+ * @swagger
+ * /api/admins/students/import/{jobId}/credentials:
+ *   get:
+ *     summary: Download credentials for imported students
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get("/students/import/:jobId/credentials", adminAuth, asyncHandler(downloadImportCredentials));
+
+/**
+ * @swagger
+ * /api/admins/mentors/import/template:
+ *   get:
+ *     summary: Download CSV template for mentor import
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get("/mentors/import/template", adminAuth, asyncHandler(downloadImportTemplate));
+
+/**
+ * @swagger
+ * /api/admins/mentors/import:
+ *   post:
+ *     summary: Bulk import mentors (accepts CSV/Excel file or JSON)
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.post("/mentors/import", adminAuth, async (req, res, next) => {
+  // Import multer middleware dynamically
+  const { uploadMentorFile } = await import("../middleware/fileUpload.js");
+  
+  // Apply multer middleware
+  uploadMentorFile(req, res, (err) => {
+    if (err) {
+      return next(err);
+    }
+    // Continue to the actual handler
+    asyncHandler(bulkImportMentors)(req, res, next);
+  });
+});
+
+/**
+ * @swagger
+ * /api/admins/mentors/import/{jobId}:
+ *   get:
+ *     summary: Get mentor import job status
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get("/mentors/import/:jobId", adminAuth, asyncHandler(getImportJobStatus));
+
+/**
+ * @swagger
+ * /api/admins/mentors/import/{jobId}/credentials:
+ *   get:
+ *     summary: Download credentials for imported mentors
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get("/mentors/import/:jobId/credentials", adminAuth, asyncHandler(downloadImportCredentials));
 
 /**
  * @swagger

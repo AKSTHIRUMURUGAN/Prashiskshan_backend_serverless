@@ -440,7 +440,8 @@ router.get(
   "/:studentId/credit-requests/:requestId",
   studentAuth,
   validateObjectIdParam("studentId"),
-  validateObjectIdParam("requestId"),
+  // Note: requestId can be either MongoDB ObjectId or custom creditRequestId (CR-xxx)
+  // Validation is handled in the service layer
   asyncHandler(getCreditRequestDetails)
 );
 
@@ -457,7 +458,7 @@ router.put(
   "/:studentId/credit-requests/:requestId/resubmit",
   studentAuth,
   validateObjectIdParam("studentId"),
-  validateObjectIdParam("requestId"),
+  // Note: requestId can be either MongoDB ObjectId or custom creditRequestId (CR-xxx)
   creditRequestResubmission,
   handleValidationErrors,
   asyncHandler(resubmitCreditRequest)

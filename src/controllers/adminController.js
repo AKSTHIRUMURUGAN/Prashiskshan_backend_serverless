@@ -266,61 +266,218 @@ export const suspendCompany = async (req, res, next) => {
   }
 };
 
-export const bulkImportStudents = async (req, res, next) => {
+export const bulkImportMentors = async (req, res, next) => {
   try {
     const admin = await ensureAdminContext(req);
-    const { students = [] } = req.body;
-    if (!Array.isArray(students) || students.length === 0) {
-      throw createHttpError(400, "students array is required");
+    
+    let mentors = [];
+    
+    // Check if file was uploaded
+    if (req.file) {
+      // Parse CSV/Excel file
+      const { parseMentorFile } = await import("../services/csvParserService.js");
+      mentors = parseMentorFile(req.file.buffer, req.file.mimetype);
+      
+      if (mentors.length === 0) {
+        throw createHttpError(400, "No valid mentor records found in file");
+      }
+    } else if (req.body.mentors) {
+      // Use JSON data from request body
+      mentors = req.body.mentors;
+      
+      if (!Array.isArray(mentors) || mentors.length === 0) {
+        throw createHttpError(400, "mentors array is required");
+      }
+    } else {
+      throw createHttpError(400, "Either upload a file or provide mentors array in request body");
     }
 
-    const jobId = `IMPORT-${Date.now()}`;
-    importJobs.set(jobId, { status: "processing", total: students.length, processed: 0, errors: [] });
+    const jobId = `MENTOR-IMPORT-${Date.now()}`;
+    importJobs.set(jobId, { 
+      status: "processing", 
+      total: mentors.length, 
+      processed: 0, 
+      errors: [],
+      credentials: [],
+      existing: [],
+      startedAt: new Date()
+    });
 
-    // simulate async import
+    // Import mentors asynchronously with Firebase and MongoDB
     (async () => {
-      for (const record of students) {
+      const { processMentorRecord } = await import("../services/mentorImportService.js");
+      
+      for (const record of mentors) {
         try {
-          if (!record.email || !record.name) {
-            throw new Error("Missing email or name");
-          }
-          await Student.updateOne(
-            { email: record.email },
-            {
-              $setOnInsert: {
-                studentId: `STD-${Date.now()}`,
-                firebaseUid: `import-${Date.now()}`,
-                email: record.email,
-                profile: {
-                  name: record.name,
-                  department: record.department || "Unknown",
-                  year: record.year || 1,
-                  college: record.college || "Default",
-                },
-              },
-            },
-            { upsert: true },
-          );
+          const result = await processMentorRecord(record);
+          
           const job = importJobs.get(jobId);
           if (job) {
             job.processed += 1;
+            
+            if (result.success) {
+              // Store credentials only for newly created accounts
+              if (result.password) {
+                job.credentials.push({
+                  name: record.name,
+                  email: result.email,
+                  password: result.password,
+                  mentorId: result.mentorId,
+                  firebaseUid: result.firebaseUid,
+                });
+              } else if (result.isUpdate) {
+                // Track existing/updated records
+                job.existing.push({
+                  name: record.name,
+                  email: result.email,
+                  mentorId: result.mentorId,
+                  status: 'Updated - Email already exists'
+                });
+              }
+            } else {
+              job.errors.push({ 
+                record: { email: record.email, name: record.name }, 
+                error: result.error 
+              });
+            }
+            
             importJobs.set(jobId, job);
           }
         } catch (error) {
           const job = importJobs.get(jobId);
           if (job) {
-            job.errors.push({ record, error: error.message });
+            job.errors.push({ 
+              record: { email: record.email, name: record.name }, 
+              error: error.message 
+            });
+            job.processed += 1;
             importJobs.set(jobId, job);
           }
         }
       }
+      
       const job = importJobs.get(jobId);
       if (job) {
         job.status = "completed";
         job.completedAt = new Date();
         importJobs.set(jobId, job);
       }
-      logger.info("Student import completed", { jobId, admin: admin.adminId });
+    })();
+
+    res.json(
+      apiSuccess(
+        { jobId, total: mentors.length },
+        "Mentor import started. Use the jobId to check progress."
+      )
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const bulkImportStudents = async (req, res, next) => {
+  try {
+    const admin = await ensureAdminContext(req);
+    
+    let students = [];
+    
+    // Check if file was uploaded
+    if (req.file) {
+      // Parse CSV/Excel file
+      const { parseStudentFile } = await import("../services/csvParserService.js");
+      students = parseStudentFile(req.file.buffer, req.file.mimetype);
+      
+      if (students.length === 0) {
+        throw createHttpError(400, "No valid student records found in file");
+      }
+    } else if (req.body.students) {
+      // Use JSON data from request body
+      students = req.body.students;
+      
+      if (!Array.isArray(students) || students.length === 0) {
+        throw createHttpError(400, "students array is required");
+      }
+    } else {
+      throw createHttpError(400, "Either upload a file or provide students array in request body");
+    }
+
+    const jobId = `IMPORT-${Date.now()}`;
+    importJobs.set(jobId, { 
+      status: "processing", 
+      total: students.length, 
+      processed: 0, 
+      errors: [],
+      credentials: [],
+      existing: [],
+      startedAt: new Date()
+    });
+
+    // Import students asynchronously with Firebase and MongoDB
+    (async () => {
+      const { processStudentRecord } = await import("../services/studentImportService.js");
+      
+      for (const record of students) {
+        try {
+          const result = await processStudentRecord(record);
+          
+          const job = importJobs.get(jobId);
+          if (job) {
+            job.processed += 1;
+            
+            if (result.success) {
+              // Store credentials only for newly created accounts
+              if (result.password) {
+                job.credentials.push({
+                  name: record.name,
+                  email: result.email,
+                  password: result.password,
+                  studentId: result.studentId,
+                  firebaseUid: result.firebaseUid,
+                });
+              } else if (result.isUpdate) {
+                // Track existing/updated records
+                job.existing.push({
+                  name: record.name,
+                  email: result.email,
+                  studentId: result.studentId,
+                  status: 'Updated - Email already exists'
+                });
+              }
+            } else {
+              job.errors.push({ 
+                record: { email: record.email, name: record.name }, 
+                error: result.error 
+              });
+            }
+            
+            importJobs.set(jobId, job);
+          }
+        } catch (error) {
+          const job = importJobs.get(jobId);
+          if (job) {
+            job.errors.push({ 
+              record: { email: record.email, name: record.name }, 
+              error: error.message 
+            });
+            job.processed += 1;
+            importJobs.set(jobId, job);
+          }
+        }
+      }
+      
+      const job = importJobs.get(jobId);
+      if (job) {
+        job.status = "completed";
+        job.completedAt = new Date();
+        importJobs.set(jobId, job);
+      }
+      logger.info("Student import completed", { 
+        jobId, 
+        admin: admin.adminId,
+        total: students.length,
+        successful: job.credentials.length,
+        failed: job.errors.length
+      });
     })();
 
     res.status(202).json(apiSuccess({ jobId }, "Import started"));
@@ -334,6 +491,88 @@ export const getImportJobStatus = (req, res, next) => {
     const { jobId } = req.params;
     if (!importJobs.has(jobId)) throw createHttpError(404, "Job not found");
     res.json(apiSuccess(importJobs.get(jobId), "Import job status"));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const downloadImportCredentials = async (req, res, next) => {
+  try {
+    await ensureAdminContext(req);
+    const { jobId } = req.params;
+    
+    if (!importJobs.has(jobId)) {
+      throw createHttpError(404, "Job not found");
+    }
+    
+    const job = importJobs.get(jobId);
+    
+    if (job.status !== "completed") {
+      throw createHttpError(400, "Job is not completed yet");
+    }
+    
+    if (!job.credentials || job.credentials.length === 0) {
+      throw createHttpError(404, "No credentials available for this job");
+    }
+    
+    // Detect if this is for mentors or students based on the URL or jobId
+    const isMentorJob = req.originalUrl.includes('/mentors/import/') || jobId.startsWith('MENTOR-IMPORT-');
+    
+    let csvHeader, csvRows;
+    
+    if (isMentorJob) {
+      // Mentor credentials format
+      csvHeader = "Name,Email,Password,Mentor ID,Firebase UID\n";
+      csvRows = job.credentials.map(cred => 
+        `${cred.name || ''},${cred.email},${cred.password},${cred.mentorId || ''},${cred.firebaseUid}`
+      ).join("\n");
+    } else {
+      // Student credentials format
+      csvHeader = "Name,Email,Password,Student ID,Firebase UID\n";
+      csvRows = job.credentials.map(cred => 
+        `${cred.name || ''},${cred.email},${cred.password},${cred.studentId || ''},${cred.firebaseUid}`
+      ).join("\n");
+    }
+    
+    const csvContent = csvHeader + csvRows;
+    
+    // Set headers for file download
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", `attachment; filename=credentials-${jobId}.csv`);
+    res.send(csvContent);
+    
+    logger.info("Credentials downloaded", { jobId, count: job.credentials.length, type: isMentorJob ? 'mentor' : 'student' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const downloadImportTemplate = async (req, res, next) => {
+  try {
+    await ensureAdminContext(req);
+    
+    // Detect if this is for mentors or students based on the URL
+    const isMentorTemplate = req.originalUrl.includes('/mentors/import/template');
+    
+    let csvContent;
+    let filename;
+    
+    if (isMentorTemplate) {
+      const { generateMentorCSVTemplate } = await import("../services/csvParserService.js");
+      csvContent = generateMentorCSVTemplate();
+      filename = "mentor-import-template.csv";
+    } else {
+      const { generateCSVTemplate } = await import("../services/csvParserService.js");
+      csvContent = generateCSVTemplate();
+      filename = "student-import-template.csv";
+    }
+    
+    // Set headers for file download
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", `attachment; filename=${filename}`);
+    res.send(csvContent);
+    
+    logger.info(`Import template downloaded: ${filename}`);
   } catch (error) {
     next(error);
   }

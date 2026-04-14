@@ -67,7 +67,10 @@ const completionSchema = new Schema(
     status: { type: String, enum: ["pending", "issued", "completed"], default: "pending" },
     
     // Credit request tracking
-    creditRequest: { type: creditRequestSchema, default: () => ({}) },
+    creditRequest: { 
+      type: creditRequestSchema, 
+      default: () => ({ requested: false, requestId: null, status: null }) 
+    },
     
     // Company completion details
     companyCompletion: companyCompletionSchema,

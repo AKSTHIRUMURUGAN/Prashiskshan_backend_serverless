@@ -1,0 +1,20 @@
+email,name,department,designation,phone,bio,specialization,yearsOfExperience
+mentor1@university.edu,Dr. Rajesh Kumar,Computer Science,Professor,+91-9876543201,"Expert in Artificial Intelligence and Machine Learning","AI,Machine Learning,Deep Learning",20
+mentor2@university.edu,Prof. Priya Sharma,Electrical Engineering,Associate Professor,+91-9876543202,"Specializes in Power Systems and Renewable Energy","Power Systems,Renewable Energy,Smart Grids",15
+mentor3@university.edu,Dr. Amit Patel,Mechanical Engineering,Assistant Professor,+91-9876543203,"Research focus on Robotics and Automation","Robotics,Automation,Control Systems",10
+mentor4@university.edu,Prof. Sunita Reddy,Civil Engineering,Professor,+91-9876543204,"Expert in Structural Engineering and Construction Management","Structural Engineering,Construction Management",22
+mentor5@university.edu,Dr. Vikram Singh,Electronics Engineering,Associate Professor,+91-9876543205,"Specializes in VLSI Design and Embedded Systems","VLSI,Embedded Systems,IoT",12
+mentor6@university.edu,Prof. Anjali Gupta,Information Technology,Professor,+91-9876543206,"Expert in Cloud Computing and Cybersecurity","Cloud Computing,Cybersecurity,DevOps",18
+mentor7@university.edu,Dr. Rahul Verma,Chemical Engineering,Assistant Professor,+91-9876543207,"Research in Process Control and Optimization","Process Control,Optimization,Chemical Processes",8
+mentor8@university.edu,Prof. Kavita Desai,Biotechnology,Professor,+91-9876543208,"Specializes in Genetic Engineering and Bioinformatics","Genetic Engineering,Bioinformatics,Molecular Biology",25
+mentor9@university.edu,Dr. Sanjay Mehta,Aerospace Engineering,Associate Professor,+91-9876543209,"Expert in Aerodynamics and Flight Mechanics","Aerodynamics,Flight Mechanics,CFD",14
+mentor10@university.edu,Prof. Neha Joshi,Computer Science,Professor,+91-9876543210,"Specializes in Data Science and Big Data Analytics","Data Science,Big Data,Analytics",19
+mentor11@university.edu,Dr. Arjun Nair,Electrical Engineering,Assistant Professor,+91-9876543211,"Research in Signal Processing and Communications","Signal Processing,Communications,5G",9
+mentor12@university.edu,Prof. Meera Iyer,Mechanical Engineering,Professor,+91-9876543212,"Expert in Thermal Engineering and Heat Transfer","Thermal Engineering,Heat Transfer,Energy Systems",21
+mentor13@university.edu,Dr. Karthik Rao,Civil Engineering,Associate Professor,+91-9876543213,"Specializes in Geotechnical Engineering","Geotechnical Engineering,Soil Mechanics,Foundation Design",13
+mentor14@university.edu,Prof. Divya Menon,Electronics Engineering,Professor,+91-9876543214,"Expert in Communication Systems and Wireless Networks","Communication Systems,Wireless Networks,5G",17
+mentor15@university.edu,Dr. Anil Kumar,Information Technology,Assistant Professor,+91-9876543215,"Research in Artificial Intelligence and NLP","AI,NLP,Machine Learning",11
+mentor16@university.edu,Prof. Pooja Agarwal,Chemical Engineering,Professor,+91-9876543216,"Specializes in Polymer Science and Materials","Polymer Science,Materials Engineering,Nanotechnology",23
+mentor17@university.edu,Dr. Manoj Pillai,Biotechnology,Associate Professor,+91-9876543217,"Expert in Bioprocess Engineering","Bioprocess Engineering,Fermentation,Bioreactors",15
+mentor18@university.edu,Prof. Ritu Kapoor,Aerospace Engineering,Professor,+91-9876543218,"Specializes in Spacecraft Design and Propulsion","Spacecraft Design,Propulsion,Orbital Mechanics",20
+mentor19@university.edu,Dr. Sures

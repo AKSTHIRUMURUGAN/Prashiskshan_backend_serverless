@@ -1059,6 +1059,7 @@ export const getCompletedInternshipsWithCreditStatus = async (req, res, next) =>
       InternshipCompletion.find(query)
         .populate('internshipId')
         .populate('companyId')
+        .populate('studentId')
         .sort({ completionDate: -1 })
         .skip(skip)
         .limit(limit)
@@ -1075,11 +1076,56 @@ export const getCompletedInternshipsWithCreditStatus = async (req, res, next) =>
     // Import helpers for handling orphaned references
     const { handleOrphanedInternship, logOrphanedReferences } = await import("./helpers/orphanedReferences.js");
     
+    // Import Logbook model to fetch logbook stats
+    const Logbook = (await import("../models/Logbook.js")).default;
+    
+    // Fetch logbook stats for all completions
+    const logbookStats = await Promise.all(
+      completions.map(async (completion) => {
+        const [submitted, pending, ratings] = await Promise.all([
+          Logbook.countDocuments({
+            studentId: completion.studentId,
+            internshipId: completion.internshipId,
+            status: 'approved'
+          }),
+          Logbook.countDocuments({
+            studentId: completion.studentId,
+            internshipId: completion.internshipId,
+            status: { $in: ['pending_company_review', 'pending_mentor_review', 'submitted'] }
+          }),
+          Logbook.find({
+            studentId: completion.studentId,
+            internshipId: completion.internshipId,
+            'mentorFeedback.rating': { $exists: true }
+          }).select('mentorFeedback.rating').lean()
+        ]);
+        
+        const avgRating = ratings.length > 0
+          ? ratings.reduce((sum, log) => sum + (log.mentorFeedback?.rating || 0), 0) / ratings.length
+          : 0;
+        
+        return {
+          completionId: completion.completionId,
+          logbooksSubmitted: submitted,
+          pendingLogbooks: pending,
+          averageRating: avgRating
+        };
+      })
+    );
+    
+    // Create a map for quick lookup
+    const statsMap = new Map(logbookStats.map(stat => [stat.completionId, stat]));
+    
     // Track orphaned references for logging
     const orphanedReferences = [];
     
     // Handle orphaned internship references and enhance with credit request availability
     const enhancedCompletions = completions.map(completion => {
+      const stats = statsMap.get(completion.completionId) || {
+        logbooksSubmitted: 0,
+        pendingLogbooks: 0,
+        averageRating: 0
+      };
       let internshipData;
       let isOrphaned = false;
       
@@ -1100,28 +1146,47 @@ export const getCompletedInternshipsWithCreditStatus = async (req, res, next) =>
         internshipData = completion.internshipId;
       }
       
+      // Get student name
+      const studentName = completion.studentId?.name || student.name || 'Unknown Student';
+      
+      // Get start date from internship or cached data
+      const startDate = isOrphaned 
+        ? (completion.cachedInternshipData?.startDate || completion.completionDate)
+        : (internshipData.startDate || completion.completionDate);
+      
       // Transform to match frontend CompletedInternship interface
       return {
         _id: completion._id,
         completionId: completion.completionId,
         internshipCompletionId: completion.completionId,
+        applicationId: completion.applicationId || completion._id,
         studentId: completion.studentId,
+        studentName: studentName,
         internshipId: internshipData,
         companyId: completion.companyId,
         internshipTitle: isOrphaned ? internshipData.title : internshipData.title,
         department: isOrphaned ? internshipData.department : internshipData.department,
         companyName: isOrphaned ? internshipData.companyName : (completion.companyId?.companyName || 'Unknown'),
-        totalHours: completion.totalHours,
-        creditsEarned: completion.creditsEarned,
+        startDate: startDate,
+        totalHours: completion.totalHours || 0,
+        creditsEarned: completion.creditsEarned || 0,
+        logbooksSubmitted: stats.logbooksSubmitted,
+        pendingLogbooks: stats.pendingLogbooks,
+        averageRating: stats.averageRating,
         completionDate: completion.completionDate,
         status: completion.status,
         evaluation: completion.evaluation,
         certificates: completion.certificates,
         aiSummary: completion.aiSummary,
         isInternshipOrphaned: isOrphaned,
-        creditRequest: completion.creditRequest,
-        creditRequestAvailable: !completion.creditRequest?.requested,
-        canRequestCredit: !completion.creditRequest?.requested,
+        creditRequest: {
+          requested: completion.creditRequest?.requested || false,
+          requestId: completion.creditRequest?.requestId || null,
+          status: completion.creditRequest?.status || null,
+          requestedAt: completion.creditRequest?.requestedAt || null
+        },
+        creditRequestAvailable: !(completion.creditRequest?.requested),
+        canRequestCredit: !(completion.creditRequest?.requested),
         creditRequestStatus: completion.creditRequest?.status || null,
         creditRequestId: completion.creditRequest?.requestId || null,
         companyCompletion: completion.companyCompletion,

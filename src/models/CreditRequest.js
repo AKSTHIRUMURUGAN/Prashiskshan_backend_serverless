@@ -91,7 +91,7 @@ const creditRequestSchema = new Schema(
       index: true,
     },
     internshipId: { type: Schema.Types.ObjectId, ref: "Internship", required: true },
-    mentorId: { type: Schema.Types.ObjectId, ref: "Mentor", required: true, index: true },
+    mentorId: { type: Schema.Types.ObjectId, ref: "Mentor", required: false, index: true, default: null },
 
     // Request details
     requestedCredits: { type: Number, required: true },

@@ -130,9 +130,43 @@ export const createCreditRequest = async (studentId, internshipCompletionId) => 
       throw new Error(`NEP compliance validation failed: ${compliance.reason}`);
     }
 
-    // Get mentor ID - for now, use a placeholder if not assigned
-    // In production, this should be properly assigned to the student
-    const mentorId = student.profile?.mentorId || "507f1f77bcf86cd799439099";
+    // Get mentor ID - find a mentor from the student's department
+    let mentorId = student.profile?.mentorId;
+    
+    if (!mentorId) {
+      // If no mentor assigned, find one from the student's department
+      const Mentor = (await import("../models/Mentor.js")).default;
+      
+      const studentDepartment = student.profile?.department || internship.department;
+      logger.info("Looking for mentor in department", {
+        studentId,
+        department: studentDepartment,
+        studentProfile: student.profile
+      });
+      
+      const departmentMentor = await Mentor.findOne({
+        "profile.department": studentDepartment,
+        status: "active"
+      }).select("_id profile.department");
+      
+      if (departmentMentor) {
+        mentorId = departmentMentor._id;
+        logger.info("Auto-assigned mentor from department", {
+          studentId,
+          mentorId: mentorId.toString(),
+          department: departmentMentor.profile?.department
+        });
+      } else {
+        // Log warning but allow credit request to be created without mentor
+        // Admin can assign mentor later
+        logger.warn("No active mentor found for department - credit request will be created without mentor", {
+          studentId,
+          department: studentDepartment,
+          internshipId: internship._id
+        });
+        mentorId = null;
+      }
+    }
 
     // Generate unique credit request ID
     const creditRequestId = `CR-${Date.now()}-${studentId.toString().slice(-6)}`;

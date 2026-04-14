@@ -1,0 +1,4 @@
+email,name,department,designation,phone,bio,specialization,yearsOfExperience
+john11.doe@university.edu,Dr. John Doe,Computer Science,Associate Professor,+91-9876543210,"Experienced professor specializing in AI and Machine Learning with 15 years of teaching experience","AI,Machine Learning,Data Science",15
+jane11.smith@university.edu,Prof. Jane Smith,Electrical Engineering,Professor,+91-9876543211,Senior faculty member with expertise in IoT and Embedded Systems,"IoT,Embedded Systems,Robotics",20
+robert11.wilson@university.edu,Dr. Robert Wilson,Mechanical Engineering,Assistant Professor,+91-9876543212,Research-focused faculty member in thermal engineering and renewable energy,"Thermal Engineering,Renewable Energy,CAD",10
