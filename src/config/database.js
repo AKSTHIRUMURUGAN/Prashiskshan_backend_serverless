@@ -7,11 +7,16 @@ const RETRY_DELAY_MS = 2000;
 
 mongoose.set("strictQuery", true);
 
+// Serverless-optimized connection options
 const connectionOptions = {
   maxPoolSize: 10,
+  minPoolSize: 2,
   serverSelectionTimeoutMS: 5000,
   socketTimeoutMS: 45000,
   family: 4, // Force IPv4
+  maxIdleTimeMS: 10000, // Close idle connections after 10s
+  retryWrites: true,
+  retryReads: true,
 };
 
 mongoose.connection.on("connected", () => {
@@ -30,7 +35,26 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const connectDB = async (attempt = 1) => {
   try {
+    // Check if already connected
+    if (mongoose.connection.readyState === 1) {
+      logger.info("MongoDB already connected, reusing connection");
+      return mongoose.connection;
+    }
+    
+    // Check if connecting
+    if (mongoose.connection.readyState === 2) {
+      logger.info("MongoDB connection in progress, waiting...");
+      // Wait for connection to complete
+      await new Promise((resolve, reject) => {
+        mongoose.connection.once('connected', resolve);
+        mongoose.connection.once('error', reject);
+      });
+      return mongoose.connection;
+    }
+    
+    logger.info(`Connecting to MongoDB (attempt ${attempt})...`);
     await mongoose.connect(config.mongo.uri, connectionOptions);
+    logger.info("MongoDB connected successfully");
     return mongoose.connection;
   } catch (error) {
     logger.error(`MongoDB connection attempt ${attempt} failed`, error);

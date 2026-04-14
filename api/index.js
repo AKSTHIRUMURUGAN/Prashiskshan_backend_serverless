@@ -2,6 +2,7 @@ import express from "express";
 import helmet from "helmet";
 import cors from "cors";
 import compression from "compression";
+import mongoose from "mongoose";
 
 const app = express();
 
@@ -371,16 +372,35 @@ const initializeApp = async () => {
 };
 
 const ensureDbConnection = async () => {
-  if (!isConnected && connectDB) {
-    try {
-      await connectDB();
+  if (!connectDB) return;
+  
+  try {
+    // Check if mongoose is already connected
+    if (mongoose.connection.readyState === 1) {
+      // Already connected
       isConnected = true;
-      if (logger) logger.info("Database connected for serverless function");
-      console.log("Database connected");
-    } catch (error) {
-      console.error("Database connection failed:", error.message);
-      // Don't throw - allow app to work without DB for health checks
+      return;
     }
+    
+    // Check if connection is connecting
+    if (mongoose.connection.readyState === 2) {
+      // Wait for connection to establish
+      await new Promise((resolve) => {
+        mongoose.connection.once('connected', resolve);
+      });
+      isConnected = true;
+      return;
+    }
+    
+    // Connection is disconnected or uninitialized, connect now
+    await connectDB();
+    isConnected = true;
+    if (logger) logger.info("Database connected for serverless function");
+    console.log("Database connected");
+  } catch (error) {
+    console.error("Database connection failed:", error.message);
+    // Don't throw - allow app to work without DB for some routes
+    throw error; // But throw for API routes that need DB
   }
 };
 
@@ -399,8 +419,11 @@ const ensureBullBoard = async () => {
 // Serverless handler
 export default async (req, res) => {
   try {
+    const url = req.url || req.path || "";
+    const pathname = url.split('?')[0]; // Remove query parameters
+    
     // Health checks and root don't need full initialization
-    if (req.url === "/" || req.url === "/health" || req.url === "/api/health" || req.url === "/api") {
+    if (pathname === "/" || pathname === "/health" || pathname === "/api/health" || pathname === "/api") {
       return app(req, res);
     }
     
@@ -410,16 +433,34 @@ export default async (req, res) => {
     }
     
     // Swagger/docs routes don't need database
-    if (req.url.startsWith("/api-docs") || 
-        req.url.startsWith("/swagger") || 
-        req.url.startsWith("/api/docs") ||
-        req.url === "/swagger.json" ||
-        req.url === "/api-docs.json") {
+    const isDocsRoute = 
+      pathname === "/api-docs" || 
+      pathname === "/swagger" || 
+      pathname === "/api/docs" ||
+      pathname === "/swagger.json" ||
+      pathname === "/api-docs.json" ||
+      pathname === "/api/docs.json";
+    
+    if (isDocsRoute) {
       return app(req, res);
     }
     
-    // Connect to database for API routes
-    await ensureDbConnection();
+    // Connect to database for API routes only
+    if (pathname.startsWith("/api/")) {
+      try {
+        await ensureDbConnection();
+      } catch (dbError) {
+        console.error("Database connection failed for API route:", dbError.message);
+        return res.status(503).json({
+          success: false,
+          error: {
+            code: "DATABASE_UNAVAILABLE",
+            message: "Database connection failed. Please try again later.",
+            timestamp: new Date().toISOString()
+          }
+        });
+      }
+    }
     
     // Register Bull Board (optional)
     await ensureBullBoard();
