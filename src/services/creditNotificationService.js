@@ -1,263 +1,235 @@
-import { addToQueue } from "../queues/index.js";
 import { logger } from "../utils/logger.js";
 import CreditRequest from "../models/CreditRequest.js";
-import Student from "../models/Student.js";
-import Mentor from "../models/Mentor.js";
+import Notification from "../models/Notification.js";
 import Admin from "../models/Admin.js";
-import Internship from "../models/Internship.js";
-import creditMetricsService from "./creditMetricsService.js";
 
 /**
- * Add a credit notification job to the queue
- * @param {string} jobName - Name of the notification job
- * @param {Object} data - Job data
- * @param {Object} options - Additional job options
- * @returns {Promise<Object>} - Job result
+ * Direct notification service for credit requests
+ * Replaces queue-based notification system with direct database operations
  */
-const addCreditNotificationJob = async (jobName, data, options = {}) => {
+
+const createNotification = async (userId, title, message, type = "info", metadata = {}) => {
   try {
-    const job = await addToQueue("creditNotification", jobName, data, {
-      priority: options.priority || 1,
-      ...options,
+    const notification = await Notification.create({
+      notificationId: `NOTIF-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      userId,
+      title,
+      message,
+      type,
+      metadata,
+      read: false,
     });
-    logger.info("Credit notification job added to queue", {
-      jobName,
-      jobId: job.id,
-      creditRequestId: data.creditRequestId,
-    });
-    
-    // Track notification as pending
-    creditMetricsService.trackNotificationPending(jobName, data.creditRequestId);
-    
-    return job;
+    logger.info("Notification created", { userId, title, type });
+    return notification;
   } catch (error) {
-    logger.error("Failed to add credit notification job to queue", {
-      jobName,
-      error: error.message,
-      data,
-    });
-    
-    // Track notification failure
-    creditMetricsService.trackNotificationFailed(jobName, data.creditRequestId, error);
-    
+    logger.error("Failed to create notification", { error: error.message, userId, title });
     throw error;
   }
 };
 
-/**
- * CreditNotificationService
- * Handles all notifications for the credit transfer system lifecycle
- */
-class CreditNotificationService {
-  /**
-   * Notify student that their credit request has been created
-   * @param {Object} creditRequest - The credit request document
-   * @returns {Promise<Object>} - Notification result
-   */
+const trackNotificationDelivery = async (creditRequestId, notificationType, recipientRole) => {
+  try {
+    await CreditRequest.findByIdAndUpdate(creditRequestId, {
+      $push: {
+        "metadata.notificationsSent": {
+          type: notificationType,
+          recipientRole,
+          sentAt: new Date(),
+        },
+      },
+    });
+  } catch (error) {
+    logger.warn("Failed to track notification delivery", { error: error.message });
+  }
+};
+
+const creditNotificationService = {
   async notifyStudentRequestCreated(creditRequest) {
     try {
-      // Queue the notification job
-      await addCreditNotificationJob("credit-student-request-created", {
-        creditRequestId: creditRequest.creditRequestId,
-      });
+      await createNotification(
+        creditRequest.studentId,
+        "Credit Request Submitted",
+        `Your credit request for ${creditRequest.credits} credits has been submitted and is pending mentor review.`,
+        "info",
+        { creditRequestId: creditRequest._id, requestId: creditRequest.requestId }
+      );
 
-      logger.info("Student request created notification queued", {
-        creditRequestId: creditRequest.creditRequestId,
-      });
+      await trackNotificationDelivery(creditRequest._id, "student_request_created", "student");
 
-      return { success: true, notificationType: "student_request_created" };
+      return { success: true };
     } catch (error) {
-      logger.error("Failed to queue student request created notification", {
-        error: error.message,
-        creditRequestId: creditRequest.creditRequestId,
-      });
-      throw error;
+      logger.error("Failed to notify student of request creation", { error: error.message });
+      return { success: false, error: error.message };
     }
-  }
+  },
 
-  /**
-   * Notify mentor of a new credit request to review
-   * @param {Object} creditRequest - The credit request document
-   * @returns {Promise<Object>} - Notification result
-   */
   async notifyMentorNewRequest(creditRequest) {
     try {
-      // Queue the notification job
-      await addCreditNotificationJob("credit-mentor-new-request", {
-        creditRequestId: creditRequest.creditRequestId,
-      }, {
-        priority: 2, // Higher priority for mentor notifications
-      });
+      const isResubmission = creditRequest.status === "resubmitted";
+      const title = isResubmission ? "Credit Request Resubmitted" : "New Credit Request";
+      const message = isResubmission
+        ? `Student has resubmitted credit request ${creditRequest.requestId} for review.`
+        : `New credit request ${creditRequest.requestId} for ${creditRequest.credits} credits requires your review.`;
 
-      logger.info("Mentor new request notification queued", {
-        creditRequestId: creditRequest.creditRequestId,
-      });
+      await createNotification(
+        creditRequest.mentorId,
+        title,
+        message,
+        "action_required",
+        { creditRequestId: creditRequest._id, requestId: creditRequest.requestId }
+      );
 
-      return { success: true, notificationType: "mentor_new_request" };
+      const notificationType = isResubmission ? "mentor_request_resubmitted" : "mentor_new_request";
+      await trackNotificationDelivery(creditRequest._id, notificationType, "mentor");
+
+      return { success: true, notificationType };
     } catch (error) {
-      logger.error("Failed to queue mentor new request notification", {
-        error: error.message,
-        creditRequestId: creditRequest.creditRequestId,
-      });
-      throw error;
+      logger.error("Failed to notify mentor of new request", { error: error.message });
+      return { success: false, error: error.message };
     }
-  }
+  },
 
-  /**
-   * Notify student of mentor's decision (approval or rejection)
-   * @param {Object} creditRequest - The credit request document
-   * @param {string} decision - 'approved' or 'rejected'
-   * @returns {Promise<Object>} - Notification result
-   */
   async notifyStudentMentorDecision(creditRequest, decision) {
     try {
-      // Queue the notification job
-      await addCreditNotificationJob("credit-student-mentor-decision", {
-        creditRequestId: creditRequest.creditRequestId,
-        decision,
-      }, {
-        priority: 2, // Higher priority for decision notifications
-      });
+      const title = decision === "approved" ? "Mentor Approved Credit Request" : "Mentor Rejected Credit Request";
+      const message =
+        decision === "approved"
+          ? `Your credit request ${creditRequest.requestId} has been approved by your mentor and forwarded to admin.`
+          : `Your credit request ${creditRequest.requestId} has been rejected by your mentor. Reason: ${creditRequest.mentorReview?.comments || "No reason provided"}`;
 
-      logger.info("Student mentor decision notification queued", {
-        creditRequestId: creditRequest.creditRequestId,
-        decision,
-      });
+      await createNotification(
+        creditRequest.studentId,
+        title,
+        message,
+        decision === "approved" ? "success" : "warning",
+        { creditRequestId: creditRequest._id, requestId: creditRequest.requestId, decision }
+      );
 
-      return { success: true, notificationType: `student_mentor_${decision}` };
+      await trackNotificationDelivery(creditRequest._id, `student_mentor_${decision}`, "student");
+
+      return { success: true };
     } catch (error) {
-      logger.error("Failed to queue student mentor decision notification", {
-        error: error.message,
-        creditRequestId: creditRequest.creditRequestId,
-        decision,
-      });
-      throw error;
+      logger.error("Failed to notify student of mentor decision", { error: error.message });
+      return { success: false, error: error.message };
     }
-  }
+  },
 
-  /**
-   * Notify admin of a mentor-approved credit request
-   * @param {Object} creditRequest - The credit request document
-   * @returns {Promise<Object>} - Notification result
-   */
   async notifyAdminMentorApproval(creditRequest) {
     try {
-      // Queue the notification job
-      await addCreditNotificationJob("credit-admin-mentor-approval", {
-        creditRequestId: creditRequest.creditRequestId,
-      }, {
-        priority: 2, // Higher priority for admin notifications
-      });
+      const admins = await Admin.find({ isActive: true }).select("_id").lean();
 
-      logger.info("Admin mentor approval notification queued", {
-        creditRequestId: creditRequest.creditRequestId,
-      });
+      if (admins.length === 0) {
+        logger.warn("No active admins found for notification");
+        return { success: false, error: "No active admins" };
+      }
 
-      return { success: true, notificationType: "admin_mentor_approval" };
+      await Promise.all(
+        admins.map((admin) =>
+          createNotification(
+            admin._id,
+            "Credit Request Pending Admin Review",
+            `Credit request ${creditRequest.requestId} for ${creditRequest.credits} credits has been approved by mentor and requires admin review.`,
+            "action_required",
+            { creditRequestId: creditRequest._id, requestId: creditRequest.requestId }
+          )
+        )
+      );
+
+      await trackNotificationDelivery(creditRequest._id, "admin_mentor_approval", "admin");
+
+      return { success: true, adminCount: admins.length };
     } catch (error) {
-      logger.error("Failed to queue admin mentor approval notification", {
-        error: error.message,
-        creditRequestId: creditRequest.creditRequestId,
-      });
-      throw error;
+      logger.error("Failed to notify admins of mentor approval", { error: error.message });
+      return { success: false, error: error.message };
     }
-  }
+  },
 
-  /**
-   * Notify student of admin's decision (approval or rejection)
-   * @param {Object} creditRequest - The credit request document
-   * @param {string} decision - 'approved' or 'rejected'
-   * @returns {Promise<Object>} - Notification result
-   */
   async notifyStudentAdminDecision(creditRequest, decision) {
     try {
-      // Queue the notification job
-      await addCreditNotificationJob("credit-student-admin-decision", {
-        creditRequestId: creditRequest.creditRequestId,
-        decision,
-      }, {
-        priority: 2, // Higher priority for decision notifications
-      });
+      const title = decision === "approved" ? "Credits Added to Your Account" : "Credit Request Rejected by Admin";
+      const message =
+        decision === "approved"
+          ? `Your credit request ${creditRequest.requestId} has been approved. ${creditRequest.credits} credits have been added to your account.`
+          : `Your credit request ${creditRequest.requestId} has been rejected by admin. Reason: ${creditRequest.adminReview?.comments || "No reason provided"}`;
 
-      logger.info("Student admin decision notification queued", {
-        creditRequestId: creditRequest.creditRequestId,
-        decision,
-      });
+      await createNotification(
+        creditRequest.studentId,
+        title,
+        message,
+        decision === "approved" ? "success" : "error",
+        { creditRequestId: creditRequest._id, requestId: creditRequest.requestId, decision }
+      );
 
-      return { success: true, notificationType: `student_admin_${decision}` };
+      await trackNotificationDelivery(creditRequest._id, `student_admin_${decision}`, "student");
+
+      return { success: true };
     } catch (error) {
-      logger.error("Failed to queue student admin decision notification", {
-        error: error.message,
-        creditRequestId: creditRequest.creditRequestId,
-        decision,
-      });
-      throw error;
+      logger.error("Failed to notify student of admin decision", { error: error.message });
+      return { success: false, error: error.message };
     }
-  }
+  },
 
-  /**
-   * Notify student that credits have been added to their profile
-   * @param {Object} creditRequest - The credit request document
-   * @param {Object} certificate - Certificate data with URL and ID
-   * @returns {Promise<Object>} - Notification result
-   */
   async notifyStudentCreditsAdded(creditRequest, certificate) {
     try {
-      // Queue the notification job
-      await addCreditNotificationJob("credit-student-credits-added", {
-        creditRequestId: creditRequest.creditRequestId,
-        certificate,
-      }, {
-        priority: 2, // Higher priority for completion notifications
-      });
+      await createNotification(
+        creditRequest.studentId,
+        "Credits Added Successfully",
+        `${creditRequest.credits} credits have been added to your account. Your completion certificate is ready for download.`,
+        "success",
+        {
+          creditRequestId: creditRequest._id,
+          requestId: creditRequest.requestId,
+          certificateUrl: certificate?.url,
+        }
+      );
 
-      logger.info("Student credits added notification queued", {
-        creditRequestId: creditRequest.creditRequestId,
-      });
+      await trackNotificationDelivery(creditRequest._id, "student_credits_added", "student");
 
-      return { success: true, notificationType: "student_credits_added" };
+      return { success: true };
     } catch (error) {
-      logger.error("Failed to queue student credits added notification", {
-        error: error.message,
-        creditRequestId: creditRequest.creditRequestId,
-      });
-      throw error;
+      logger.error("Failed to notify student of credits added", { error: error.message });
+      return { success: false, error: error.message };
     }
-  }
+  },
 
-  /**
-   * Send a reminder notification for pending reviews
-   * @param {Object} creditRequest - The credit request document
-   * @param {string} recipientRole - 'mentor' or 'admin'
-   * @returns {Promise<Object>} - Notification result
-   */
   async sendReviewReminder(creditRequest, recipientRole) {
     try {
-      // Queue the notification job
-      await addCreditNotificationJob("credit-review-reminder", {
-        creditRequestId: creditRequest.creditRequestId,
-        recipientRole,
-      }, {
-        priority: 2, // Higher priority for reminders
+      if (recipientRole === "mentor") {
+        await createNotification(
+          creditRequest.mentorId,
+          "Reminder: Credit Request Pending Review",
+          `Credit request ${creditRequest.requestId} is still pending your review. Please review at your earliest convenience.`,
+          "reminder",
+          { creditRequestId: creditRequest._id, requestId: creditRequest.requestId }
+        );
+      } else if (recipientRole === "admin") {
+        const admins = await Admin.find({ isActive: true }).select("_id").lean();
+        await Promise.all(
+          admins.map((admin) =>
+            createNotification(
+              admin._id,
+              "Reminder: Credit Request Pending Admin Review",
+              `Credit request ${creditRequest.requestId} is still pending admin review.`,
+              "reminder",
+              { creditRequestId: creditRequest._id, requestId: creditRequest.requestId }
+            )
+          )
+        );
+      } else {
+        throw new Error("Invalid recipient role");
+      }
+
+      await CreditRequest.findByIdAndUpdate(creditRequest._id, {
+        $inc: { "metadata.remindersSent": 1 },
       });
 
-      logger.info("Review reminder notification queued", {
-        creditRequestId: creditRequest.creditRequestId,
-        recipientRole,
-      });
-
-      return { success: true, notificationType: `reminder_${recipientRole}` };
+      return { success: true };
     } catch (error) {
-      logger.error("Failed to queue review reminder notification", {
-        error: error.message,
-        creditRequestId: creditRequest.creditRequestId,
-        recipientRole,
-      });
+      logger.error("Failed to send review reminder", { error: error.message });
       throw error;
     }
-  }
-}
+  },
+};
 
-// Export singleton instance
-export const creditNotificationService = new CreditNotificationService();
+export { creditNotificationService };
 export default creditNotificationService;

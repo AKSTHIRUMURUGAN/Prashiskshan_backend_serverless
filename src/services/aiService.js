@@ -1,5 +1,4 @@
 import { models } from "../config/gemini.js";
-import { get as redisGet, set as redisSet } from "../config/redis.js";
 import AiUsageLog from "../models/AiUsageLog.js";
 import { logger } from "../utils/logger.js";
 
@@ -95,14 +94,13 @@ export const trackUsage = async ({ userId, role = "system", feature, tokensUsed,
 };
 
 export const getCachedResponse = async (key) => {
-  if (!key) return null;
-  const cached = await redisGet(key);
-  return cached ? JSON.parse(cached) : null;
+  // Caching disabled - Redis removed
+  return null;
 };
 
 export const setCachedResponse = async (key, value, ttl = DEFAULT_CACHE_TTL) => {
-  if (!key) return;
-  await redisSet(key, JSON.stringify(value), ttl);
+  // Caching disabled - Redis removed
+  return;
 };
 
 export const aiService = {

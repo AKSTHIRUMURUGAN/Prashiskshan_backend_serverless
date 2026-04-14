@@ -266,13 +266,11 @@ let attachRequestId;
 let errorHandler;
 let generalRateLimiter;
 let connectDB;
-let registerBullBoard;
 let logger;
 let getSwaggerHTML;
 
 let isInitialized = false;
 let isConnected = false;
-let bullBoardRegistered = false;
 
 const initializeApp = async () => {
   if (isInitialized) return;
@@ -287,7 +285,6 @@ const initializeApp = async () => {
     const errorMiddleware = await import("../src/middleware/errorHandler.js");
     const rateLimiterMiddleware = await import("../src/middleware/rateLimiter.js");
     const loggerUtil = await import("../src/utils/logger.js");
-    const queuesModule = await import("../src/queues/index.js");
     const swaggerModule = await import("../src/config/swagger.js");
     const swaggerStandaloneModule = await import("./swagger-standalone.js");
     
@@ -298,7 +295,6 @@ const initializeApp = async () => {
     errorHandler = errorMiddleware.errorHandler;
     generalRateLimiter = rateLimiterMiddleware.generalRateLimiter;
     connectDB = dbModule.connectDB;
-    registerBullBoard = queuesModule.registerBullBoard;
     logger = loggerUtil.logger;
     swaggerSpec = swaggerModule.swaggerSpec;
     getSwaggerHTML = swaggerStandaloneModule.getSwaggerHTML;
@@ -404,18 +400,6 @@ const ensureDbConnection = async () => {
   }
 };
 
-const ensureBullBoard = async () => {
-  if (!bullBoardRegistered && registerBullBoard && (process.env.NODE_ENV !== "production" || process.env.ENABLE_BULL_BOARD === "true")) {
-    try {
-      await registerBullBoard(app, { basePath: "/admin/queues" });
-      bullBoardRegistered = true;
-      if (logger) logger.info("Bull Board registered");
-    } catch (error) {
-      console.warn("Bull Board registration failed:", error.message);
-    }
-  }
-};
-
 // Serverless handler
 export default async (req, res) => {
   try {
@@ -461,9 +445,6 @@ export default async (req, res) => {
         });
       }
     }
-    
-    // Register Bull Board (optional)
-    await ensureBullBoard();
     
     return app(req, res);
   } catch (error) {

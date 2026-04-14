@@ -425,7 +425,6 @@ describe("Admin Routes - CRUD Operations", () => {
       expect(response.body.success).toBe(true);
       expect(response.body.data.health).toBeDefined();
       expect(response.body.data.health.mongo).toBeDefined();
-      expect(response.body.data.health.redis).toBeDefined();
       expect(response.body.data.health.uptime).toBeDefined();
     });
   });

@@ -19,6 +19,7 @@
       "reason": "Violation of terms"
     }
   },
+  "/api/admins/students/import/template": {},
   "/api/admins/students/import": {
     "post": {
       "students": [
@@ -30,6 +31,11 @@
     }
   },
   "/api/admins/students/import/{jobId}": {},
+  "/api/admins/students/import/{jobId}/credentials": {},
+  "/api/admins/mentors/import/template": {},
+  "/api/admins/mentors/import": {},
+  "/api/admins/mentors/import/{jobId}": {},
+  "/api/admins/mentors/import/{jobId}/credentials": {},
   "/api/admins/mentors/assign": {
     "post": {
       "mentorId": "MEN-2024001",
@@ -85,6 +91,12 @@
   "/api/admins/internships/:id/reject-posting": {},
   "/api/admins/internships/:id/edit": {},
   "/api/admins/internships/:id": {},
+  "/api/admins/maintenance/close-expired-internships": {},
+  "/api/admins/maintenance/generate-analytics-snapshot": {
+    "post": {
+      "period": "daily"
+    }
+  },
   "/api/applications/{id}/status": {
     "patch": {
       "status": "string",
@@ -188,6 +200,7 @@
       "email": "user@example.com"
     }
   },
+  "/api/auth/send-verification-email": {},
   "/api/auth/verify-email": {},
   "/api/auth/me": {
     "patch": {
@@ -553,15 +566,6 @@
     "post": {
       "file": "string",
       "folder": "test"
-    }
-  },
-  "/api/tests/queue": {
-    "post": {
-      "queueName": "email",
-      "data": {
-        "to": "test@example.com",
-        "template": "welcome"
-      }
     }
   },
   "/api/tests/gemini": {

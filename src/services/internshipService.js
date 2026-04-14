@@ -3,7 +3,6 @@ import Admin from "../models/Admin.js";
 import { internshipStateMachine } from "./internshipStateMachine.js";
 import { aiTaggingService } from "./aiTaggingService.js";
 import { notificationService } from "./notificationService.js";
-import { queueAITagging } from "./internshipWorkflowScheduler.js";
 import { logger } from "../utils/logger.js";
 import mongoose from "mongoose";
 
@@ -134,10 +133,10 @@ class InternshipService {
         status: internship.status,
       });
 
-      // Queue AI tagging job asynchronously (don't wait for it)
+      // Run AI tagging asynchronously (don't wait for it)
       if (options.enableAITagging !== false) {
-        queueAITagging(internshipId, options.postedBy || companyId.toString()).catch(error => {
-          logger.error("Failed to queue AI tagging for new internship", {
+        aiTaggingService.tagInternship(internshipId, options.postedBy || companyId.toString()).catch(error => {
+          logger.error("Failed to run AI tagging for new internship", {
             internshipId,
             error: error.message,
           });
@@ -318,10 +317,10 @@ class InternshipService {
         status: internship.status,
       });
 
-      // Re-queue AI tagging if content changed
+      // Re-run AI tagging if content changed
       if (hasSignificantChanges && options.enableAITagging !== false) {
-        queueAITagging(internshipId, options.actor || "system").catch(error => {
-          logger.error("Failed to queue AI tagging for updated internship", {
+        aiTaggingService.tagInternship(internshipId, options.actor || "system").catch(error => {
+          logger.error("Failed to run AI tagging for updated internship", {
             internshipId,
             error: error.message,
           });

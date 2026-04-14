@@ -15,7 +15,6 @@ import { applicationService } from "../services/applicationService.js";
 import { aiTaggingService } from "../services/aiTaggingService.js";
 import { apiSuccess } from "../utils/apiResponse.js";
 import { createHttpError, resolveUserFromRequest, sanitizeDoc } from "./helpers/context.js";
-import { get as redisGet, set as redisSet } from "../config/redis.js";
 import { logger } from "../utils/logger.js";
 
 const ensureStudentContext = async (req) => {
@@ -138,11 +137,6 @@ export const getStudentProfile = async (req, res, next) => {
 export const getStudentDashboard = async (req, res, next) => {
   try {
     const student = await ensureStudentContext(req);
-    const cacheKey = `student:dashboard:${student._id}`;
-    const cached = await redisGet(cacheKey);
-    if (cached) {
-      return res.json(apiSuccess(JSON.parse(cached), "Student dashboard"));
-    }
 
     // Get mentor info
     const Mentor = (await import("../models/Mentor.js")).default;
@@ -252,7 +246,6 @@ export const getStudentDashboard = async (req, res, next) => {
       deadlines,
     };
 
-    await redisSet(cacheKey, JSON.stringify(response), 300);
     return res.json(apiSuccess(response, "Student dashboard"));
   } catch (error) {
     next(error);
@@ -444,15 +437,9 @@ export const getInternshipDetails = async (req, res, next) => {
 export const getRecommendedInternships = async (req, res, next) => {
   try {
     const student = await ensureStudentContext(req);
-    const cacheKey = `student:recommendations:${student._id}:${Math.floor(Date.now() / 600000)}`;
-    const cached = await redisGet(cacheKey);
-    if (cached) {
-      return res.json(apiSuccess(JSON.parse(cached), "Recommended internships"));
-    }
 
     const internships = await Internship.find({ status: "approved" }).limit(20).lean();
     const recommendations = await recommendationService.getRecommendedInternships(student._id.toString(), internships);
-    await redisSet(cacheKey, JSON.stringify(recommendations), 600);
     res.json(apiSuccess(recommendations, "Recommended internships"));
   } catch (error) {
     next(error);

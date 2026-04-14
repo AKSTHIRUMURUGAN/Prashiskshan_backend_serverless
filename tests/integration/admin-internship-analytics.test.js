@@ -3,7 +3,6 @@ import express from "express";
 import adminRouter from "../../src/routes/admin.js";
 import Internship from "../../src/models/Internship.js";
 import Company from "../../src/models/Company.js";
-import * as redis from "../../src/config/redis.js";
 import { createTestAdmin, createTestCompany, getAuthToken } from "../helpers/testHelpers.js";
 
 const app = express();
@@ -199,15 +198,7 @@ describe("Admin Internship Analytics Endpoint - Task 8.1", () => {
   });
 
   beforeEach(async () => {
-    // Clear cache before each test
-    try {
-      const keys = await redis.default.keys("analytics:internships:*");
-      if (keys.length > 0) {
-        await redis.default.del(...keys);
-      }
-    } catch (error) {
-      // Ignore cache errors in tests
-    }
+    // No cache to clear anymore
   });
 
   describe("GET /admins/internships/analytics - Basic Functionality", () => {

@@ -6,7 +6,6 @@ import Notification from "../models/Notification.js";
 import { apiSuccess } from "../utils/apiResponse.js";
 import { createHttpError, resolveUserFromRequest } from "./helpers/context.js";
 import { logger } from "../utils/logger.js";
-import * as redis from "../config/redis.js";
 import { logAdminAction } from "../middleware/adminAuth.js";
 
 /**
@@ -641,20 +640,6 @@ export const getInternshipAnalytics = async (req, res, next) => {
     await ensureAdminContext(req);
     const { dateFrom, dateTo } = req.query;
 
-    // Create cache key based on query parameters
-    const cacheKey = `analytics:internships:${dateFrom || 'all'}:${dateTo || 'all'}`;
-    
-    // Try to get from cache
-    try {
-      const cachedData = await redis.get(cacheKey);
-      if (cachedData) {
-        logger.info("Returning cached analytics data", { cacheKey });
-        return res.json(apiSuccess(JSON.parse(cachedData), "Internship analytics (cached)"));
-      }
-    } catch (cacheError) {
-      logger.warn("Cache retrieval failed, proceeding with database query", { error: cacheError.message });
-    }
-
     // Build date filter
     const dateFilter = {};
     if (dateFrom || dateTo) {
@@ -763,14 +748,6 @@ export const getInternshipAnalytics = async (req, res, next) => {
       topCompanies,
       byDepartment,
     };
-
-    // Cache the result for 5 minutes (300 seconds)
-    try {
-      await redis.set(cacheKey, JSON.stringify(analyticsData), 300);
-      logger.info("Analytics data cached", { cacheKey, ttl: 300 });
-    } catch (cacheError) {
-      logger.warn("Failed to cache analytics data", { error: cacheError.message });
-    }
 
     res.json(apiSuccess(analyticsData, "Internship analytics"));
   } catch (error) {

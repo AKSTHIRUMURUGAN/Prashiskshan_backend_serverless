@@ -10,7 +10,6 @@ import { requestLogger } from "./middleware/logger.js";
 import { errorHandler, attachRequestId } from "./middleware/errorHandler.js";
 import { generalRateLimiter } from "./middleware/rateLimiter.js";
 import { logger } from "./utils/logger.js";
-import { registerBullBoard } from "./queues/index.js";
 import { swaggerSpec } from "./config/swagger.js";
 import openapiSpec from "./docs/openapi.mjs";
 
@@ -52,7 +51,6 @@ app.use(errorHandler);
 const startServer = async () => {
   try {
     await connectDB();
-    await registerBullBoard(app, { basePath: "/admin/queues" });
     const port = config.app.port || 5000;
     app.listen(port, () => {
       logger.info(`Prashiskshan API listening on port ${port}`);

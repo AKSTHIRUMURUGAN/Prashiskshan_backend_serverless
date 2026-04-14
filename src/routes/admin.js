@@ -46,6 +46,8 @@ import {
   getDepartmentPerformanceMetrics,
   getMentorPerformanceMetrics,
   getStudentPerformanceMetrics,
+  closeExpiredInternships,
+  generateAnalyticsSnapshot,
 } from "../controllers/adminController.js";
 import {
   getInternshipsList,
@@ -1041,3 +1043,41 @@ router.patch(
 );
 
 export default router;
+
+// ============================================================================
+// MAINTENANCE TASKS
+// ============================================================================
+
+/**
+ * @swagger
+ * /api/admins/maintenance/close-expired-internships:
+ *   post:
+ *     summary: Close expired internships
+ *     description: Manually trigger closing of internships past their deadline (Admin only)
+ *     tags: [Admin - Maintenance]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.post("/maintenance/close-expired-internships", adminAuth, asyncHandler(closeExpiredInternships));
+
+/**
+ * @swagger
+ * /api/admins/maintenance/generate-analytics-snapshot:
+ *   post:
+ *     summary: Generate analytics snapshot
+ *     description: Manually trigger analytics snapshot generation (Admin only)
+ *     tags: [Admin - Maintenance]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               period:
+ *                 type: string
+ *                 enum: [daily, weekly, monthly]
+ *                 default: daily
+ */
+router.post("/maintenance/generate-analytics-snapshot", adminAuth, asyncHandler(generateAnalyticsSnapshot));

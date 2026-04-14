@@ -1,278 +1,136 @@
 import CreditRequest from "../models/CreditRequest.js";
 import { creditNotificationService } from "./creditNotificationService.js";
 import { logger } from "../utils/logger.js";
-import { addToQueue } from "../queues/index.js";
 
 /**
- * CreditReminderService
- * Handles overdue detection and reminder notifications for credit requests
+ * Credit reminder service for overdue requests
+ * Replaces queue-based reminder system with direct database operations
  */
-class CreditReminderService {
+
+const creditReminderService = {
   /**
-   * Get all overdue credit requests
-   * @returns {Promise<Array>} - Array of overdue credit requests
+   * Get overdue credit requests that need reminders
    */
   async getOverdueRequests() {
     try {
-      // Get all pending requests (mentor review, admin review, student action)
-      const pendingStatuses = [
-        "pending_mentor_review",
-        "pending_admin_review",
-        "pending_student_action",
-      ];
+      const now = new Date();
+      const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
 
-      const creditRequests = await CreditRequest.find({
-        status: { $in: pendingStatuses },
+      const overdueRequests = await CreditRequest.find({
+        status: { $in: ["pending_mentor_review", "pending_admin_review"] },
+        createdAt: { $lt: threeDaysAgo },
+        "metadata.remindersSent": { $lt: 3 },
       })
-        .populate("studentId", "studentId email profile")
-        .populate("mentorId", "mentorId email profile")
-        .populate("internshipId", "title companyId duration");
-
-      // Filter for overdue requests
-      const overdueRequests = creditRequests.filter((req) => req.isOverdue());
-
-      logger.info("Retrieved overdue credit requests", {
-        total: creditRequests.length,
-        overdue: overdueRequests.length,
-      });
+        .populate("studentId", "studentId profile.firstName profile.lastName email")
+        .populate("mentorId", "mentorId profile.firstName profile.lastName email")
+        .lean();
 
       return overdueRequests;
     } catch (error) {
-      logger.error("Error getting overdue requests", { error: error.message });
-      throw error;
+      logger.error("Failed to get overdue requests", { error: error.message });
+      return [];
     }
-  }
+  },
 
   /**
-   * Send reminder for a specific credit request
-   * @param {string} creditRequestId - CreditRequest MongoDB ObjectId or creditRequestId
-   * @returns {Promise<Object>} - Reminder result
+   * Send reminders for overdue requests
    */
-  async sendReminder(creditRequestId) {
+  async sendOverdueReminders({ maxReminders = 3, dryRun = false } = {}) {
     try {
-      // Get credit request
-      const creditRequest = await CreditRequest.findOne({
-        $or: [{ _id: creditRequestId }, { creditRequestId }],
-      })
-        .populate("studentId", "studentId email profile")
-        .populate("mentorId", "mentorId email profile")
-        .populate("internshipId", "title companyId duration");
-
-      if (!creditRequest) {
-        throw new Error("Credit request not found");
-      }
-
-      // Check if request is in a state that requires reminders
-      const reminderStates = [
-        "pending_mentor_review",
-        "pending_admin_review",
-        "pending_student_action",
-      ];
-
-      if (!reminderStates.includes(creditRequest.status)) {
-        logger.warn("Credit request not in reminder-eligible state", {
-          creditRequestId: creditRequest.creditRequestId,
-          status: creditRequest.status,
-        });
-        return {
-          success: false,
-          reason: "not_eligible",
-          message: "Credit request is not in a state that requires reminders",
-        };
-      }
-
-      // Determine recipient role based on status
-      let recipientRole;
-      if (creditRequest.status === "pending_mentor_review") {
-        recipientRole = "mentor";
-      } else if (creditRequest.status === "pending_admin_review") {
-        recipientRole = "admin";
-      } else if (creditRequest.status === "pending_student_action") {
-        recipientRole = "student";
-      }
-
-      // Send reminder notification
-      await creditNotificationService.sendReviewReminder(creditRequest, recipientRole);
-
-      logger.info("Reminder sent for credit request", {
-        creditRequestId: creditRequest.creditRequestId,
-        recipientRole,
-        reminderCount: creditRequest.metadata.remindersSent + 1,
-      });
-
-      return {
-        success: true,
-        creditRequestId: creditRequest.creditRequestId,
-        recipientRole,
-        reminderCount: creditRequest.metadata.remindersSent,
-      };
-    } catch (error) {
-      logger.error("Error sending reminder", {
-        error: error.message,
-        creditRequestId,
-      });
-      throw error;
-    }
-  }
-
-  /**
-   * Send reminders for all overdue requests
-   * @param {Object} options - Options for reminder sending
-   * @returns {Promise<Object>} - Summary of reminders sent
-   */
-  async sendOverdueReminders(options = {}) {
-    try {
-      const { maxReminders = 3, dryRun = false } = options;
-
-      // Get all overdue requests
       const overdueRequests = await this.getOverdueRequests();
-
-      // Filter out requests that have exceeded max reminders
-      const eligibleRequests = overdueRequests.filter(
-        (req) => req.metadata.remindersSent < maxReminders
-      );
-
-      logger.info("Processing overdue reminders", {
-        totalOverdue: overdueRequests.length,
-        eligible: eligibleRequests.length,
-        maxReminders,
-        dryRun,
-      });
 
       if (dryRun) {
         return {
           dryRun: true,
           totalOverdue: overdueRequests.length,
-          eligible: eligibleRequests.length,
-          requests: eligibleRequests.map((req) => ({
-            creditRequestId: req.creditRequestId,
+          requests: overdueRequests.map((req) => ({
+            requestId: req.requestId,
             status: req.status,
-            daysSinceLastUpdate: Math.floor(
-              (Date.now() - req.lastUpdatedAt) / (1000 * 60 * 60 * 24)
-            ),
-            remindersSent: req.metadata.remindersSent,
+            daysSinceCreation: Math.floor((Date.now() - req.createdAt) / (1000 * 60 * 60 * 24)),
+            remindersSent: req.metadata?.remindersSent || 0,
           })),
         };
       }
 
-      // Send reminders
-      const results = await Promise.allSettled(
-        eligibleRequests.map((req) => this.sendReminder(req.creditRequestId))
-      );
-
-      const successful = results.filter((r) => r.status === "fulfilled").length;
-      const failed = results.filter((r) => r.status === "rejected").length;
-
-      logger.info("Overdue reminders sent", {
-        total: eligibleRequests.length,
-        successful,
-        failed,
-      });
-
-      return {
-        totalOverdue: overdueRequests.length,
-        eligible: eligibleRequests.length,
-        sent: successful,
-        failed,
-        results: results.map((r, idx) => ({
-          creditRequestId: eligibleRequests[idx].creditRequestId,
-          status: r.status,
-          result: r.status === "fulfilled" ? r.value : { error: r.reason?.message },
-        })),
+      const results = {
+        sent: 0,
+        failed: 0,
+        skipped: 0,
       };
-    } catch (error) {
-      logger.error("Error sending overdue reminders", { error: error.message });
-      throw error;
-    }
-  }
 
-  /**
-   * Schedule automatic reminder job
-   * This should be called periodically (e.g., daily) to check for overdue requests
-   * @param {Object} options - Scheduling options
-   * @returns {Promise<Object>} - Job scheduling result
-   */
-  async scheduleReminderJob(options = {}) {
-    try {
-      const { maxReminders = 3, repeat = { pattern: "0 9 * * *" } } = options;
+      for (const request of overdueRequests) {
+        const remindersSent = request.metadata?.remindersSent || 0;
 
-      // Add recurring job to notification queue
-      const job = await addToQueue(
-        "notification",
-        "send-credit-reminders",
-        { maxReminders },
-        {
-          repeat,
-          jobId: "credit-reminder-job",
+        if (remindersSent >= maxReminders) {
+          results.skipped++;
+          continue;
         }
-      );
 
-      logger.info("Credit reminder job scheduled", {
-        jobId: job.id,
-        repeat,
-        maxReminders,
-      });
+        try {
+          const recipientRole = request.status === "pending_mentor_review" ? "mentor" : "admin";
+          await creditNotificationService.sendReviewReminder(request, recipientRole);
+          results.sent++;
+        } catch (error) {
+          logger.error("Failed to send reminder", { requestId: request.requestId, error: error.message });
+          results.failed++;
+        }
+      }
 
-      return {
-        success: true,
-        jobId: job.id,
-        schedule: repeat,
-      };
+      logger.info("Overdue reminders sent", results);
+      return { ...results, totalOverdue: overdueRequests.length };
     } catch (error) {
-      logger.error("Error scheduling reminder job", { error: error.message });
+      logger.error("Failed to send overdue reminders", { error: error.message });
       throw error;
     }
-  }
+  },
 
   /**
    * Get reminder statistics
-   * @returns {Promise<Object>} - Reminder statistics
    */
   async getReminderStats() {
     try {
-      const overdueRequests = await this.getOverdueRequests();
+      const [byStatus, totalOverdue, highReminderCount] = await Promise.all([
+        CreditRequest.aggregate([
+          {
+            $match: {
+              status: { $in: ["pending_mentor_review", "pending_admin_review"] },
+            },
+          },
+          {
+            $group: {
+              _id: "$status",
+              count: { $sum: 1 },
+              avgRemindersSent: { $avg: { $ifNull: ["$metadata.remindersSent", 0] } },
+            },
+          },
+        ]),
+        CreditRequest.countDocuments({
+          status: { $in: ["pending_mentor_review", "pending_admin_review"] },
+          createdAt: { $lt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) },
+        }),
+        CreditRequest.countDocuments({
+          "metadata.remindersSent": { $gte: 2 },
+          status: { $in: ["pending_mentor_review", "pending_admin_review"] },
+        }),
+      ]);
 
       const stats = {
-        totalOverdue: overdueRequests.length,
         byStatus: {},
-        byReminderCount: {},
-        averageDaysOverdue: 0,
+        totalOverdue,
+        highReminderCount,
       };
 
-      let totalDaysOverdue = 0;
-
-      overdueRequests.forEach((req) => {
-        // Count by status
-        stats.byStatus[req.status] = (stats.byStatus[req.status] || 0) + 1;
-
-        // Count by reminder count
-        const reminderCount = req.metadata.remindersSent;
-        stats.byReminderCount[reminderCount] =
-          (stats.byReminderCount[reminderCount] || 0) + 1;
-
-        // Calculate days overdue
-        const daysOverdue = Math.floor(
-          (Date.now() - req.lastUpdatedAt) / (1000 * 60 * 60 * 24)
-        );
-        totalDaysOverdue += daysOverdue;
+      byStatus.forEach((item) => {
+        stats.byStatus[item._id] = item.count;
       });
-
-      if (overdueRequests.length > 0) {
-        stats.averageDaysOverdue = Math.round(
-          totalDaysOverdue / overdueRequests.length
-        );
-      }
-
-      logger.info("Reminder statistics retrieved", stats);
 
       return stats;
     } catch (error) {
-      logger.error("Error getting reminder stats", { error: error.message });
-      throw error;
+      logger.error("Failed to get reminder stats", { error: error.message });
+      return { byStatus: {}, totalOverdue: 0, highReminderCount: 0 };
     }
-  }
-}
+  },
+};
 
-// Export singleton instance
-export const creditReminderService = new CreditReminderService();
+export { creditReminderService };
 export default creditReminderService;

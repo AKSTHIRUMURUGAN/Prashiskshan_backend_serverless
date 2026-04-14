@@ -3,7 +3,6 @@ import multer from "multer";
 import { authenticate, identifyUser, authorize } from "../middleware/auth.js";
 import { emailService } from "../services/emailService.js";
 import { storageService } from "../services/storageService.js";
-import { addToQueue } from "../queues/index.js";
 import { aiService } from "../services/aiService.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { apiSuccess, apiError } from "../utils/apiResponse.js";
@@ -173,88 +172,6 @@ router.post(
 
 /**
  * @swagger
- * /api/tests/queue:
- *   post:
- *     summary: Test queue service
- *     description: Add a test job to the queue to verify queue configuration (Admin only)
- *     tags: [Testing]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - queueName
- *             properties:
- *               queueName:
- *                 type: string
- *                 enum: [email, sms, logbook, report, notification, completion, ai]
- *                 example: "email"
- *               data:
- *                 type: object
- *                 example:
- *                   to: "test@example.com"
- *                   template: "welcome"
- *     responses:
- *       200:
- *         description: Job added to queue successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   type: object
- *                   properties:
- *                     jobId:
- *                       type: string
- *                     queueName:
- *                       type: string
- *       401:
- *         description: Unauthorized
- *       403:
- *         description: Forbidden - Admin only
- *       500:
- *         description: Queue service error
- */
-router.post(
-  "/queue",
-  adminAuth,
-  asyncHandler(async (req, res) => {
-    const { queueName, data } = req.body;
-
-    if (!queueName) {
-      return res.status(400).json(apiError("Missing required field: queueName"));
-    }
-
-    const validQueues = ["email", "sms", "logbook", "report", "notification", "completion", "ai"];
-    if (!validQueues.includes(queueName)) {
-      return res.status(400).json(apiError(`Invalid queue name. Must be one of: ${validQueues.join(", ")}`));
-    }
-
-    try {
-      const job = await addToQueue(queueName, data || {}, {
-        priority: 1,
-        attempts: 1,
-      });
-
-      logger.info("Test job added to queue", { queueName, jobId: job.id });
-      res.json(apiSuccess({ jobId: job.id, queueName }, "Test job added to queue successfully"));
-    } catch (error) {
-      logger.error("Test queue job failed", error);
-      res.status(500).json(apiError("Failed to add test job to queue", { error: error.message }));
-    }
-  }),
-);
-
-/**
- * @swagger
  * /api/tests/gemini:
  *   post:
  *     summary: Test Gemini AI service
@@ -388,9 +305,6 @@ router.get(
       },
       s3: {
         configured: !!(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY),
-      },
-      queue: {
-        connected: true, // Redis connection is checked at startup
       },
       gemini: {
         configured: !!process.env.GEMINI_API_KEY,

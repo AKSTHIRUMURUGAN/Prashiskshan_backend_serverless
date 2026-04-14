@@ -1,4 +1,3 @@
-import { get as redisGet, set as redisSet } from "../config/redis.js";
 import Logbook from "../models/Logbook.js";
 import { aiService } from "./aiService.js";
 import { logger } from "../utils/logger.js";
@@ -22,10 +21,6 @@ Learnings: ${logbook.learnings || "Not provided"}
 
 export const logbookSummaryService = {
   async generateLogbookSummary(logbookId) {
-    const cacheKey = SUMMARY_CACHE_KEY(logbookId);
-    const cached = await redisGet(cacheKey);
-    if (cached) return JSON.parse(cached);
-
     const logbook = await Logbook.findById(logbookId);
     if (!logbook) throw new Error("Logbook not found");
 
@@ -44,7 +39,6 @@ export const logbookSummaryService = {
       logbook.status = "pending_mentor_review";
     }
     await logbook.save();
-    await redisSet(cacheKey, JSON.stringify(summary), SUMMARY_TTL_SECONDS);
     return summary;
   },
 
@@ -70,23 +64,18 @@ export const logbookSummaryService = {
   },
 
   async validateLogbookQuality(logbook) {
-    const cacheKey = QUALITY_CACHE_KEY(logbook.logbookId || logbook._id);
-    const cached = await redisGet(cacheKey);
-    if (cached) return JSON.parse(cached);
-
     const prompt = `Assess the quality of this internship logbook entry. Evaluate detail, professionalism, technical depth, and learning reflection. Return JSON with fields: qualityScore (0-100), feedback (string), suggestions (array).
 Entry: ${logbook.activities}
 Learnings: ${logbook.learnings || "N/A"}
 Challenges: ${logbook.challenges || "N/A"}`;
 
     const analysis = await aiService.generateStructuredJSON(prompt, {
-      cacheKey,
+      cacheKey: QUALITY_CACHE_KEY(logbook.logbookId || logbook._id),
       ttl: 3600,
       feature: "logbook_quality",
       userId: logbook.studentId,
       role: "student",
     });
-    await redisSet(cacheKey, JSON.stringify(analysis), 3600);
     return analysis;
   },
 

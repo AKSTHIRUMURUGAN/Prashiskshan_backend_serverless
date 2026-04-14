@@ -1,4 +1,3 @@
-import { get as redisGet, set as redisSet } from "../config/redis.js";
 import Student from "../models/Student.js";
 import Internship from "../models/Internship.js";
 import { aiService } from "./aiService.js";
@@ -23,10 +22,6 @@ const scoreInternship = (student, internship) => {
 
 export const recommendationService = {
   async getRecommendedInternships(studentId, availableInternships = null) {
-    const cacheKey = `reco:internships:${studentId}:${Math.floor(Date.now() / 600000)}`;
-    const cached = await redisGet(cacheKey);
-    if (cached) return JSON.parse(cached);
-
     const student = await Student.findById(studentId).lean();
     if (!student) return [];
     const internships =
@@ -34,7 +29,6 @@ export const recommendationService = {
         ? availableInternships
         : await Internship.find({ status: "approved" }).limit(20).lean();
     const recommendations = internships.map((internship) => scoreInternship(student, internship)).sort((a, b) => b.matchScore - a.matchScore);
-    await redisSet(cacheKey, JSON.stringify(recommendations), 600);
     return recommendations;
   },
 

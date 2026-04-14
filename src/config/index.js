@@ -9,8 +9,6 @@ const requiredKeys = [
   "FRONTEND_URL",
   "MONGODB_URI",
   "MONGODB_TEST_URI",
-  "REDIS_HOST",
-  "REDIS_PORT",
   "FIREBASE_PROJECT_ID",
   "FIREBASE_PRIVATE_KEY",
   "FIREBASE_CLIENT_EMAIL",
@@ -64,11 +62,6 @@ const config = {
   mongo: {
     uri: process.env.MONGODB_URI,
     testUri: process.env.MONGODB_TEST_URI,
-  },
-  redis: {
-    host: process.env.REDIS_HOST,
-    port: number(process.env.REDIS_PORT, 6379),
-    password: process.env.REDIS_PASSWORD || undefined,
   },
   firebase: {
     projectId: process.env.FIREBASE_PROJECT_ID || "test-project",

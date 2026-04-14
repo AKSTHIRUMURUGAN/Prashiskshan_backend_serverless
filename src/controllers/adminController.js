@@ -867,7 +867,6 @@ export const getSystemHealth = async (req, res, next) => {
     await ensureAdminContext(req);
     const health = {
       mongo: mongoose.connection.readyState === 1 ? "up" : "down",
-      redis: "up",
       uptime: process.uptime(),
       version: "v1",
     };
@@ -1331,24 +1330,24 @@ export const sendOverdueReminders = async (req, res, next) => {
 
 /**
  * POST /api/admin/credit-requests/reminders/schedule
- * Schedule automatic reminder job
+ * Send reminders for overdue credit requests (no longer scheduled, runs immediately)
  */
 export const scheduleReminderJob = async (req, res, next) => {
   try {
     await ensureAdminContext(req);
 
-    const { maxReminders = 3, cronPattern = "0 9 * * *" } = req.body;
+    const { maxReminders = 3, dryRun = false } = req.body;
 
     const { creditReminderService } = await import("../services/creditReminderService.js");
-    const result = await creditReminderService.scheduleReminderJob({
+    const result = await creditReminderService.sendOverdueReminders({
       maxReminders,
-      repeat: { pattern: cronPattern },
+      dryRun,
     });
 
     res.json(
       apiSuccess(
         result,
-        "Reminder job scheduled successfully"
+        dryRun ? "Reminder job preview (dry run)" : "Reminders sent successfully"
       )
     );
   } catch (error) {
@@ -1868,6 +1867,53 @@ export const getStudentPerformanceMetrics = async (req, res, next) => {
     logger.error("Failed to get student performance metrics", {
       error: error.message,
     });
+    next(error);
+  }
+};
+
+/**
+ * POST /api/admin/maintenance/close-expired-internships
+ * Manually trigger closing of expired internships
+ */
+export const closeExpiredInternships = async (req, res, next) => {
+  try {
+    await ensureAdminContext(req);
+
+    const { internshipService } = await import("../services/internshipService.js");
+    const service = new internshipService();
+    const result = await service.closeExpiredInternships();
+
+    logger.info("Expired internships closed", result);
+    res.json(apiSuccess(result, "Expired internships processed"));
+  } catch (error) {
+    logger.error("Failed to close expired internships", { error: error.message });
+    next(error);
+  }
+};
+
+/**
+ * POST /api/admin/maintenance/generate-analytics-snapshot
+ * Manually trigger analytics snapshot generation
+ */
+export const generateAnalyticsSnapshot = async (req, res, next) => {
+  try {
+    await ensureAdminContext(req);
+
+    const { period = "daily" } = req.body;
+
+    if (!["daily", "weekly", "monthly"].includes(period)) {
+      return res.status(400).json(apiError("Invalid period. Must be daily, weekly, or monthly"));
+    }
+
+    const { internshipAnalyticsService } = await import("../services/internshipAnalyticsService.js");
+    
+    // Generate snapshots for system-wide analytics
+    const result = await internshipAnalyticsService.cacheAnalyticsSnapshot("system", null, period);
+
+    logger.info("Analytics snapshot generated", { period, result });
+    res.json(apiSuccess(result, `${period} analytics snapshot generated`));
+  } catch (error) {
+    logger.error("Failed to generate analytics snapshot", { error: error.message });
     next(error);
   }
 };

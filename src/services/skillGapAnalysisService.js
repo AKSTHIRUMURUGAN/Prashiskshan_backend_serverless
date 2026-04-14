@@ -1,4 +1,3 @@
-import { get as redisGet, set as redisSet } from "../config/redis.js";
 import Application from "../models/Application.js";
 import Student from "../models/Student.js";
 import Internship from "../models/Internship.js";
@@ -38,10 +37,6 @@ const aggregateDepartmentData = async (department) => {
 
 export const skillGapAnalysisService = {
   async analyzeDepartmentSkillGaps(department) {
-    const cacheKey = `skillgap:dept:${department}`;
-    const cached = await redisGet(cacheKey);
-    if (cached) return JSON.parse(cached);
-
     const data = await aggregateDepartmentData(department);
     const prompt = `Analyze the following department data and identify critical skill gaps.
 Department: ${department}
@@ -53,10 +48,7 @@ Return JSON with criticalSkillGaps[{skill,count,severity}], trendAnalysis (strin
       const analysis = await aiService.generateStructuredJSON(prompt, {
         model: "reasoning",
         feature: "skill_gap_dept",
-        cacheKey,
-        ttl: dayInSeconds,
       });
-      await redisSet(cacheKey, JSON.stringify(analysis), dayInSeconds);
       return analysis;
     } catch (error) {
       logger.error("Department skill gap AI failed", { error: error.message });

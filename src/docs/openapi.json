@@ -1105,6 +1105,19 @@
         }
       }
     },
+    "/api/admins/students/import/template": {
+      "get": {
+        "summary": "Download CSV template for student import",
+        "tags": [
+          "Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
     "/api/admins/students/import": {
       "post": {
         "summary": "Bulk import students",
@@ -1219,6 +1232,71 @@
             "description": "Job not found"
           }
         }
+      }
+    },
+    "/api/admins/students/import/{jobId}/credentials": {
+      "get": {
+        "summary": "Download credentials for imported students",
+        "tags": [
+          "Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/admins/mentors/import/template": {
+      "get": {
+        "summary": "Download CSV template for mentor import",
+        "tags": [
+          "Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/admins/mentors/import": {
+      "post": {
+        "summary": "Bulk import mentors (accepts CSV/Excel file or JSON)",
+        "tags": [
+          "Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/admins/mentors/import/{jobId}": {
+      "get": {
+        "summary": "Get mentor import job status",
+        "tags": [
+          "Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/admins/mentors/import/{jobId}/credentials": {
+      "get": {
+        "summary": "Download credentials for imported mentors",
+        "tags": [
+          "Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/api/admins/mentors/assign": {
@@ -2114,6 +2192,54 @@
         ]
       }
     },
+    "/api/admins/maintenance/close-expired-internships": {
+      "post": {
+        "summary": "Close expired internships",
+        "description": "Manually trigger closing of internships past their deadline (Admin only)",
+        "tags": [
+          "Admin - Maintenance"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/admins/maintenance/generate-analytics-snapshot": {
+      "post": {
+        "summary": "Generate analytics snapshot",
+        "description": "Manually trigger analytics snapshot generation (Admin only)",
+        "tags": [
+          "Admin - Maintenance"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "period": {
+                    "type": "string",
+                    "enum": [
+                      "daily",
+                      "weekly",
+                      "monthly"
+                    ],
+                    "default": "daily"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/applications/{id}/status": {
       "patch": {
         "summary": "Update application status",
@@ -2830,6 +2956,20 @@
         }
       }
     },
+    "/api/auth/send-verification-email": {
+      "post": {
+        "summary": "Send email verification",
+        "description": "Send an email verification link to the authenticated user",
+        "tags": [
+          "Authentication"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
     "/api/auth/verify-email": {
       "post": {
         "summary": "Send email verification",
@@ -2842,6 +2982,7 @@
             "bearerAuth": []
           }
         ],
+        "deprecated": true,
         "responses": {
           "200": {
             "description": "Verification email sent successfully",
@@ -7789,93 +7930,6 @@
           },
           "500": {
             "description": "Storage service error"
-          }
-        }
-      }
-    },
-    "/api/tests/queue": {
-      "post": {
-        "summary": "Test queue service",
-        "description": "Add a test job to the queue to verify queue configuration (Admin only)",
-        "tags": [
-          "Testing"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "queueName"
-                ],
-                "properties": {
-                  "queueName": {
-                    "type": "string",
-                    "enum": [
-                      "email",
-                      "sms",
-                      "logbook",
-                      "report",
-                      "notification",
-                      "completion",
-                      "ai"
-                    ],
-                    "example": "email"
-                  },
-                  "data": {
-                    "type": "object",
-                    "example": {
-                      "to": "test@example.com",
-                      "template": "welcome"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Job added to queue successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "jobId": {
-                          "type": "string"
-                        },
-                        "queueName": {
-                          "type": "string"
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden - Admin only"
-          },
-          "500": {
-            "description": "Queue service error"
           }
         }
       }

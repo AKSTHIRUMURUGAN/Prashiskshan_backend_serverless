@@ -1,6 +1,4 @@
 import rateLimit from "express-rate-limit";
-import RedisStore from "rate-limit-redis";
-import redisClient from "../config/redis.js";
 import config from "../config/index.js";
 
 // Helper function to properly handle IPv6 addresses
@@ -9,17 +7,11 @@ const ipKeyGenerator = (req) => {
   return req.ip || req.connection?.remoteAddress || 'unknown';
 };
 
-const createRedisStore = () =>
-  new RedisStore({
-    sendCommand: (...args) => redisClient.call(...args),
-  });
-
 const generalRateLimiter = rateLimit({
   windowMs: config.security.rateLimitWindowMs,
   max: process.env.NODE_ENV === 'development' ? 10000 : config.security.rateLimitMaxRequests,
   standardHeaders: true,
   legacyHeaders: false,
-  store: createRedisStore(),
   message: { success: false, error: "Too many requests, please try again later." },
 });
 
@@ -28,7 +20,6 @@ const authRateLimiter = rateLimit({
   max: process.env.NODE_ENV === 'development' ? 10000 : 50, // Increased from 5 to 50 for production
   standardHeaders: true,
   legacyHeaders: false,
-  store: createRedisStore(),
   skip: (req) => process.env.AUTH_RATE_LIMIT_DISABLED === 'true',
   message: { success: false, error: "Too many login attempts, please try again later." },
 });
@@ -38,9 +29,11 @@ const uploadRateLimiter = rateLimit({
   max: process.env.NODE_ENV === 'development' ? 1000 : 20,
   standardHeaders: true,
   legacyHeaders: false,
-  store: createRedisStore(),
   message: { success: false, error: "Too many uploads, please try again later." },
 });
+
+// In-memory AI feature limit tracking
+const aiLimitStore = new Map();
 
 const featureLimitKey = (userId, feature) => `ai_limit:${feature}:${userId}:${new Date().toISOString().slice(0, 10)}`;
 
@@ -50,6 +43,16 @@ const secondsUntilMidnight = () => {
   reset.setHours(24, 0, 0, 0);
   return Math.max(1, Math.floor((reset.getTime() - now.getTime()) / 1000));
 };
+
+// Clean up expired AI limit entries periodically
+setInterval(() => {
+  const today = new Date().toISOString().slice(0, 10);
+  for (const [key] of aiLimitStore) {
+    if (!key.includes(today)) {
+      aiLimitStore.delete(key);
+    }
+  }
+}, 60 * 60 * 1000); // Clean up every hour
 
 export const aiFeatureLimit = (feature) => async (req, res, next) => {
   const userId = req.user?.mongoId?.toString() || req.firebase?.uid;
@@ -65,19 +68,17 @@ export const aiFeatureLimit = (feature) => async (req, res, next) => {
 
   try {
     const key = featureLimitKey(userId, feature);
-    const current = await redisClient.incr(key);
-    if (current === 1) {
-      await redisClient.expire(key, secondsUntilMidnight());
-    }
+    const current = (aiLimitStore.get(key) || 0) + 1;
+    aiLimitStore.set(key, current);
+    
     if (current > limit) {
-      const ttl = await redisClient.ttl(key);
       return res.status(429).json({
         success: false,
         error: "AI daily limit reached",
         details: {
           feature,
           limit,
-          resetInSeconds: ttl > 0 ? ttl : secondsUntilMidnight(),
+          resetInSeconds: secondsUntilMidnight(),
         },
       });
     }
@@ -97,7 +98,6 @@ const reappealRateLimiter = rateLimit({
   max: (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') ? 1000 : 3, // 3 submissions per hour in production
   standardHeaders: true,
   legacyHeaders: false,
-  store: createRedisStore(),
   message: { 
     success: false, 
     error: "TooManyReappealAttempts",
@@ -112,7 +112,6 @@ const adminBulkOperationRateLimiter = rateLimit({
   max: (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') ? 1000 : 10, // 10 bulk operations per minute in production
   standardHeaders: true,
   legacyHeaders: false,
-  store: createRedisStore(),
   message: { 
     success: false, 
     error: "TooManyBulkOperations",
@@ -131,7 +130,6 @@ const adminAnalyticsRateLimiter = rateLimit({
   max: (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') ? 1000 : 30, // 30 analytics requests per minute in production
   standardHeaders: true,
   legacyHeaders: false,
-  store: createRedisStore(),
   message: { 
     success: false, 
     error: "TooManyAnalyticsRequests",
