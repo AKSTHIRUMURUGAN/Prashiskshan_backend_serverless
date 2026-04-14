@@ -27,10 +27,11 @@ tests
 __tests__
 *.test.js
 *.spec.js
-docs
 examples
 scripts
 .dockerignore
 Dockerfile
 docker-compose.yml
-README.md
+# Exclude markdown docs but keep source code docs
+*.md
+!src/**
